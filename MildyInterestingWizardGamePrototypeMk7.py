@@ -3,7 +3,6 @@
 # Section: A
 
 # TODO:
-# ADD SPELL CANCEL FEATURE - COMBO TO DELETE ACTIVE SPELL (costs mana)
 # MAKE ENEMIES CAPABLE OF FIRING PROJECTILES
 # START WORKING ON FINAL BOSS
 # ADD HEALTH REGAIN AND MANA REGAIN ITEMS
@@ -16,17 +15,14 @@
 # name wizard - Wizard Bossfight, firstname Wizard, lastname Bossfight
 
 # QUESTIONS FOR PROF TAYLOR:
-# HOW DO I USE GITHUBBBB!!!!!!!!!!!!
 # BETTER WAY TO DEAL WITH THE EIGHT DIFFERENT INPUT VALUES FOR ANGLED RECTANGLE
 # ASK ABOUT HITBOXES AND CLASS PROJECTILE
 # ASK ABOUT SHIFT KEY ISSUE???
-# ASK ABOUT TRANSPARENCY GRADIENTS???
 # ASK ABOUT COMPILERS AND CODE DISTRIBUTION
 # ASK ABOUT STYLE - my spacing isn't always consistent, some functions are realllly long
 # ASK ABOUT CONDITIONAL USE
 
 # IMPORTS
-
 from cmu_graphics import *
 # I only use os to delete files, or detect if a file exists
 import os  
@@ -41,9 +37,7 @@ import numpy
 import random
 
 # CLASSES
-
 # ---- LIGHTING ----
-
 # intilaizing light soure class
 class LightSource:
     def __init__(self,spread,intensity,x,y,initialY,fadeRate):
@@ -58,7 +52,6 @@ class LightSource:
         self.intensity *= self.fadeRate
 
 # ---- PROJECTILES ----
-
 # initilzing BASE projectile class
 class Projectile:
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell):
@@ -425,9 +418,7 @@ class HitboxAngledRect(Hitbox):
         otherList = [other.x_1,other.y_1,other.x_2,other.y_2,other.x_3,other.y_3,other.x_4,other.y]
         return (isinstance(other,HitboxAngledRect)) and (selfList == otherList)
 
-
 # DEBUG/TESTING FUNCTIONS
-
 # temporary transparency test function
 def transparencyTest(app):
     # transparencyTestImagePath = 'images/transparenceyTest.png'
@@ -439,30 +430,36 @@ def transparencyTest(app):
     size = 500
     drawImage(transparencyTestImage,x,y,width=size,height=size,align='center')
 
-# temporary function for displaying the shield spell screen zones
-def displayScreenZones(app):
+# temporary function for displaying the defensive spell sectors (used especially for the shield spell)
+def displaySectors(app):
     sectorOpacity = 50
-    screenLeft = app.screenWidth
-    screenRight = 0
-    screenTop = 0
-    screenBottom = app.screenHeight
-
-    # establishing sector bounding coordinates
-    app.ssDownWidth
-    app.ssDownLeftBound
-    app.ssDownRightBound
-    app.ssLeftAndRightTopBound
-    app.ssLeftAndRightWidth
-    app.ssLeftAndRightLeftBound
-    app.ssLeftAndRightRightBound
 
     # drawCircle(playerHeadX, playerHeadY, 10, fill = 'red', opacity = 50)
-    drawPolygon(app.playerHeadX,app.playerHeadY,app.ssDownLeftBound,screenBottom,app.ssDownRightBound,screenBottom,fill='salmon',opacity=sectorOpacity)
-    drawPolygon(app.playerHeadX,app.playerHeadY,app.ssDownRightBound,screenBottom,screenRight,screenBottom,screenRight,app.ssLeftAndRightTopBound,fill='lightSkyBlue',opacity=sectorOpacity)
-    drawPolygon(app.playerHeadX,app.playerHeadY,app.ssDownLeftBound,screenBottom,screenLeft,screenBottom,screenLeft,app.ssLeftAndRightTopBound,fill='lightSkyBlue',opacity=sectorOpacity)
-    drawPolygon(app.playerHeadX,app.playerHeadY,screenRight,app.ssLeftAndRightTopBound,screenRight,screenTop,app.ssLeftAndRightRightBound,screenTop,fill='lightGreen',opacity=sectorOpacity)
-    drawPolygon(app.playerHeadX,app.playerHeadY,screenLeft,app.ssLeftAndRightTopBound,screenLeft,screenTop,app.ssLeftAndRightLeftBound,screenTop,fill='lightGreen',opacity=sectorOpacity)
-    drawPolygon(app.playerHeadX,app.playerHeadY,app.ssLeftAndRightLeftBound,screenTop,app.ssLeftAndRightRightBound,screenTop,fill='mediumPurple',opacity=sectorOpacity)
+
+    sectorColors = dict()
+    sectorColors['ssDown'] = 'lightGreen'
+    sectorColors['ssLeft'] = 'salmon'
+    sectorColors['ssRight'] = 'salmon'
+    sectorColors['ssUpLeft'] = 'lightSkyBlue'
+    sectorColors['ssUpRight'] = 'lightSkyBlue'
+    sectorColors['ssUp'] = 'mediumPurple'
+
+    # obtaining player head position
+    x_0 = app.playerObject.centerX
+    y_0 = app.playerObject.centerY
+
+    # arbitrary hypotenuse value, just has to be large enough such that the sectors go off the screen
+    hypotenuse = 700
+    for sector in app.sectorAngles:
+        sectorAngle_1 = app.sectorAngles[sector][0]
+        sectorAngle_2 = app.sectorAngles[sector][1]
+        # ptc('sectorAngle_1',sectorAngle_1)
+        # ptc('sectorAngle_2',sectorAngle_2)
+        x_1 = x_0 + (hypotenuse * math.cos(math.radians(sectorAngle_1)))
+        y_1 = y_0 + (hypotenuse * math.sin(math.radians(sectorAngle_1)))
+        x_2 = x_0 + (hypotenuse * math.cos(math.radians(sectorAngle_2)))
+        y_2 = y_0 + (hypotenuse * math.sin(math.radians(sectorAngle_2)))
+        drawPolygon(x_0,y_0,x_1,y_1,x_2,y_2,fill=sectorColors[sector],opacity=sectorOpacity)
 
 # temporary function for display anticipated shield positions
 def displayShieldPositions(app):
@@ -486,13 +483,6 @@ def tempDisplayReadout(app,inputList):
         lineYPosition -= lineSpacing
 
 # GENERAL HELPER FUNCTIONS
-
-def getMouseScreenSector(app,mouseX,mouseY):
-    screenLeft = app.screenWidth
-    screenRight = 0
-    screenTop = 0
-    screenBottom = app.screenHeight 
-    # DETERMINE ALIGNMENT BASED OFF OF ANGLE BETWEEN PLAYER CENTER AND MOUSE POINTER
 
 def applyRectangleRotation(app,centerX,centerY,width,height,rotationAngle):
     radAngle = math.radians(rotationAngle)
@@ -561,8 +551,33 @@ def reportError(process, errorName, function, faultType, fault,
 def make2DList(rows,cols,fillData):
     return  [ [fillData] * cols for row in range(rows)]
 
-# GENERAL PHYSICS FUNCTIONS
+def getMouseScreenSector(app,mouseX,mouseY):
+    x_0 = app.playerObject.centerX
+    y_0 = app.playerObject.centerY
+    dy = mouseY - y_0
+    dx = mouseX - x_0
+    if(dx == 0):
+        dx = 0.001
+    mouseAngle = math.degrees(math.atan(dy/dx))
+    if(dx < 0):
+        mouseAngle += 180
+    elif(dy < 0):
+        mouseAngle += 360
+    currentScreenSector = None
+    # ptc('mouseAngle',mouseAngle)
+    # the only sector that must be checked manually is ssLeft, since it
+    # crosses 0 degrees. all the other sectors can be checked in a loop
+    if((0 <= mouseAngle < app.sectorAngles['ssLeft'][0]) or (app.sectorAngles['ssLeft'][1] <= mouseAngle <= 360)):
+       currentScreenSector = 'ssLeft'
+    else:
+        for sector in app.sectorAngles:
+            sectorAngle_1 = app.sectorAngles[sector][0]
+            sectorAngle_2 = app.sectorAngles[sector][1]
+            if(sectorAngle_1 >= mouseAngle > sectorAngle_2):
+                currentScreenSector = sector
+    app.mouseScreenSector = currentScreenSector
 
+# GENERAL PHYSICS FUNCTIONS
 def updatePositioning(app):
     for tileableImageName in app.tileableImageList:
         app.ti[tileableImageName].xOffset += (app.player['x'].currentVelocity)
@@ -604,7 +619,6 @@ def simplePhysicsCalculations(subject,netForce):
     subject.currentVelocity += subject.currentAcceleration
 
 # PLAYER PHYSICS & ANIMATIONS
-
 def interpretPlayerWingImageIndex(app,indexToInterpret):
 
     # PLAYER WING IMAGE ENCODING KEY
@@ -1098,7 +1112,6 @@ def updatePlayerVelocity(app):
     updatePositioning(app)
     
 # TILEABLE IMAGES
-
 def updateTiles(app,tileableImageName):
     # retrieving variable values
     tileWidth = app.ti[tileableImageName].tileWidth
@@ -1205,7 +1218,6 @@ def tileImage(app,tileableImage,tileWidth,tileableImageName):
     app.ti[tileableImageName].initialColsList = colsList 
 
 # LIGHTING
-
 def lightmapSetup(app):
     app.lightmapScalingFactor = 50
     app.lightmapBuffer = 100
@@ -1289,7 +1301,6 @@ def drawLightmap(app):
     drawImage(app.lightmapImage,(app.lightmapXPosition+app.screenShakeX),(app.lightmapYPosition+app.screenShakeY),width = (app.lightmapMatrixX*app.lightmapScalingFactor),height = (app.lightmapMatrixY*app.lightmapScalingFactor),opacity=app.lightmapOpacity)
 
 # SPELL ORB
-
 def updateSpellOrb(app):
 
     # update image
@@ -1317,7 +1328,6 @@ def drawSpellOrb(app):
     drawImage(app.spellOrbImage,(app.spellOrbXPosition + app.screenShakeX),(app.spellOrbYPosition + app.screenShakeY), width = int(app.spellOrbImageSize * app.spellOrbScalingFactor), height = int(app.spellOrbImageSize * app.spellOrbScalingFactor), align = 'center', rotateAngle = app.spellOrbRotationAngle)
 
 # SPELL CASTING
-
 # gets the side of the orb that the mouse pointer is at the point of casting
 def getMouseOrbSide(app,mouseX):
     if mouseX >= app.spellOrbXPosition:
@@ -1327,9 +1337,29 @@ def getMouseOrbSide(app,mouseX):
 
 # charges the spell, and initiates the spell in the active spells list
 def chargeSpell(app,spellName):
-    # don't charge spell if a spell is already charged
-    if(app.spellOrbCharged):
+    # if we have recieved cancel, the cancel combo must have been input, and 
+    # we want to remove the currently charged spell, if there is one.
+    # if the spell orb is charged, there must be a charged spell, and we can go
+    # ahead with cancelling it, but if the spell orb is not charged, we don't
+    # want to pass cancel in as a spell, so we return
+    if(spellName == 'cancel'):
+        if(app.spellOrbCharged):
+            # find the currently charged spell, and remove it from it's
+            # respective active spell list
+            for spellType in app.spellTypes:
+                if(len(app.spellData[spellType].activeSpell) == 1):
+                    chargedSpell = app.spellData[spellType].activeSpell[0]
+                    app.spellData[spellType].activeSpell = []
+            # restore half the mana cost of the currently charged spell
+            app.playerMana = min((app.playerMana + int(chargedSpell.manaCost * 0.5), app.playerMaxMana))
+            # uncharge the Spell Orb
+            app.spellOrbCharged = False
+            # return, so as to not try to charge spell 'cancel'
         return
+    else:
+        # don't charge spell if a spell is already charged
+        if(app.spellOrbCharged):
+            return
     
     # making sure the spell is acceptable, by attempting to reference it
     try:
@@ -1403,11 +1433,10 @@ def initiateSpellCast(app,spellName,targetX,targetY):
         app.spells[spellName].displayHeight = app.spells[spellName].imageHeight
     # shield spell
     elif(app.spells[spellName].displayType == 'shield'):
-        # pick shield alingment depending on which sector of the screen the mouse is in
-
-        app.spells[spellName].xPosition = 0 
-        app.spells[spellName].yPosition = 0
-        pass
+        # pick shield alignment depending on which sector of the screen the mouse is in
+        print(app.mouseScreenSector)
+        app.spells[spellName].xPosition = app.shieldPositions[app.mouseScreenSector][0]
+        app.spells[spellName].yPosition = app.shieldPositions[app.mouseScreenSector][1]
     # projectile-based spells
     elif((app.spells[spellName].displayType in app.projectileTypeList)):
         # get initial data from spell setup
@@ -1478,7 +1507,8 @@ def castSpell(app,spellName):
             app.spellData[spellType].activeSpell = {}
             return
     elif(app.spells[spellName].displayType == 'shield'):
-        pass
+        app.spells[spellName].animationCounter = 0
+        spellDirection = app.mouseScreenSector
     elif(app.spells[spellName].displayType in app.projectileTypeList):
         if((spellName not in app.activePlayerProjectiles) and (spellName not in app.activeMapProjectiles)):
             app.spells[spellName].animationCounter = 0
@@ -1537,7 +1567,6 @@ def activateSpellEffect(app,spellName):
         print('YIPPEE!!')
 
 # PROJECTILE MANAGEMENT
-
 def drawProjectile(app,projectileName):
      if(app.projectile[projectileName].imagePath != None):
         totalXPosition = (app.projectile[projectileName].xPosition+app.projectile[projectileName].xOffset)
@@ -1609,7 +1638,6 @@ def initiateProjectile(app,projectileName):
         reportError('getting projectie data','UNRECOGNIZED PROJECTILE','getProjectileData','recieved unexpected projectile name',projectileName,None)
 
 # ENEMIES
-
 def updateEnemies(app):
     enemiesToDelete = set()
     for enemyName in app.enemies:
@@ -1635,7 +1663,6 @@ def drawEnemies(app):
         drawImage(enemy.imagePath, (enemy.xPosition+enemy.xOffset+app.screenShakeX), (enemy.yPosition+enemy.yOffset+app.screenShakeY), width = enemy.displayWidth, height = enemy.displayHeight, rotateAngle = enemy.displayAngle, align = enemy.alignment )
     
 # GUI
-
 def updateGui(app):
     if(app.gameState == 'main'):
         # fdaing out start cutscene once game has started
@@ -1702,16 +1729,18 @@ def drawCombo(app):
     i = 0
     comboShakeX = random.randint(-app.comboShake, app.comboShake)
     comboShakeY = random.randint(-app.comboShake, app.comboShake)
-    if(app.displayCombo == 'combo failed!'):
+
+    # initializing splash text dictionary, and respective entries
+    splashTextDict = dict()
+    splashTextDict['combo failed!'] = 'images/GUI/comboFailed.png'
+    splashTextDict['overcharged!'] = 'images/GUI/comboOvercharged.png'
+    splashTextDict['insufficient mana!'] = 'images/GUI/comboInsufficientMana.png'
+    splashTextDict['cancel'] = 'images/GUI/comboChargeCancelled.png'
+
+    if(app.displayCombo in splashTextDict):
         if(app.comboCounter != 0):
-            drawImage('images/GUI/comboFailed.png', (app.comboImageTop + (i * app.comboImageSpacing) + comboShakeX), (app.comboImageLeft + comboShakeY), width = int(app.comboDetailTextWidth * app.comboImageScale), height = int(app.comboImageSize * app.comboImageScale))
-    elif(app.displayCombo == 'overcharged!'):
-        if(app.comboCounter != 0):
-            drawImage('images/GUI/comboOvercharged.png', (app.comboImageTop + (i * app.comboImageSpacing) + comboShakeX), (app.comboImageLeft + comboShakeY), width = int(app.comboDetailTextWidth * app.comboImageScale), height = int(app.comboImageSize * app.comboImageScale))
-    elif(app.displayCombo == 'insufficient mana!'):
-        if(app.comboCounter != 0):
-            drawImage('images/GUI/comboInsufficientMana.png', (app.comboImageTop + (i * app.comboImageSpacing) + comboShakeX), (app.comboImageLeft + comboShakeY), width = int(app.comboDetailTextWidth * app.comboImageScale), height = int(app.comboImageSize * app.comboImageScale))    
-    elif((app.displayCombo != 'combo failed!')):
+            drawImage(splashTextDict[app.displayCombo], (app.comboImageTop + (i * app.comboImageSpacing) + comboShakeX), (app.comboImageLeft + comboShakeY), width = int(app.comboDetailTextWidth * app.comboImageScale), height = int(app.comboImageSize * app.comboImageScale))
+    else:
         for char in app.displayCombo:
             comboImagePath = f'images/GUI/combo_{char}.PNG'
             if(not(os.path.exists(comboImagePath))):
@@ -1760,7 +1789,7 @@ def drawGui(app):
 
         if(app.gameState == 'paused'):
             drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.pauseScreenOpacity)
-            drawLabel('[temp] PAUSED', app.screenWidth//2, app.screenHeight//2, fill = 'white', size = 50)
+            drawGuiElement(app,'pauseText')
         elif(app.gameState == 'dead'):
             drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.deathCutsceneOverlayOpacity) 
             drawGuiElement(app,'deathText')
@@ -1773,7 +1802,6 @@ def drawGui(app):
         drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.startCutsceneOverlayOpacity)  
 
 # SCREEN SHAKE
-
 def updateScreenShake(app):
     if(app.screenShakeMagnitude != 0):
 
@@ -1787,7 +1815,6 @@ def updateScreenShake(app):
         app.screenShakeCounter = 0
 
 # HITBOX & HITBOX MANAGEMENT
-
 def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,hitboxType):
     if(hitboxType == 'hitboxCircle'):
         print('initiated circle')
@@ -1816,7 +1843,7 @@ def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,h
         centerY = associatedObject.yPosition - associatedObject.initialYOffset
         targetX = associatedObject.targetX
         targetY = associatedObject.targetY - associatedObject.initialYOffset
-        print(associatedObject.initialYOffset)
+        # print(associatedObject.initialYOffset)
         # print(centerX, centerY)
         width = associatedObject.displayWidth - xAdjustment
         height = int(associatedObject.displayHeight) - yAdjustment
@@ -1984,7 +2011,6 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         reportError('attempting to run collision calculations','UNRECOGNIZED COLLISION TYPE','runCollisionCalculations','recieved collision type',collisionType,None)
 
 def checkCollisions(app):
-
     # temporary debugging slowdown for collision checks
     # if((app.hitboxCounter % 20) != 0):
     #     app.hitboxCounter += 1
@@ -2011,17 +2037,24 @@ def checkCollisions(app):
     pass
 
 # COMBO MANAGEMENT
-
 def setupCombos(app):
+    # initializing combo data sets
     app.fullComboSet = set()
     app.fullLetterSet = set()
+    # getting the combos from all created spells and adding them to the 
+    # combo data sets as appropriate
     for spell in app.spells:
         currentCombo = app.spells[spell].combo
-        print('current spell:',app.spells[spell].name)
+        # print('current spell:',app.spells[spell].name)
         for letter in currentCombo:
-            if(not letter in app.fullLetterSet):
-                app.fullLetterSet.add(letter)
+            app.fullLetterSet.add(letter)
         app.fullComboSet.add(currentCombo)
+
+    # adding cancel combo
+    for letter in app.cancelCombo:
+        app.fullLetterSet.add(letter)
+    app.fullComboSet.add(app.cancelCombo)
+
     ptc('app.fullComboSet',app.fullComboSet)
     ptc('app.fullLetterSet',app.fullLetterSet)
 
@@ -2048,7 +2081,9 @@ def matchesCombo(app):
     return(combosIn > 0)
 
 def detectCombos(app,currentKey):
-    if(not app.spellOrbCharged):
+    # don't run combo detection if the spell orb is charged, or if the combo
+    # we want is part of the cancel combo
+    if((not app.spellOrbCharged) or (currentKey in app.cancelCombo)):
         app.comboShake = 0
         app.comboInProgress += currentKey
         app.displayCombo = app.comboInProgress
@@ -2060,6 +2095,13 @@ def detectCombos(app,currentKey):
             app.displayCombo = 'combo failed!'
             app.comboInProgress = ''
         elif(comboMatched != True):
+            if(comboMatched == app.cancelCombo):
+                # print('charged Spell Canceled')
+                chargeSpell(app,'cancel')
+                app.comboCounter = 30
+                app.comboShake += 10
+                app.displayCombo = 'cancel'
+                app.comboInProgress = ''
             for spell in app.spells:
                 if(comboMatched == app.spells[spell].combo):
                     print(f'charging spell {app.spells[spell].name} with corresponding combo {comboMatched}. ({comboMatched} = {app.spells[spell].combo})')
@@ -2067,7 +2109,6 @@ def detectCombos(app,currentKey):
                     app.comboInProgress = ''
 
 # APP EVENT HANDLERS
-
 def onKeyPress(app,key):
 
     if(app.gameState == 'main'):
@@ -2088,8 +2129,10 @@ def onKeyPress(app,key):
             app.transparencyTest = not app.transparencyTest
         if(key == 'j'):
             app.displayShieldPositions = not app.displayShieldPositions
+        if(key == 'u'):
+            app.printMouseScreenSector = not app.printMouseScreenSector
 
-        
+
         if(key in app.fullLetterSet):
             detectCombos(app,key)
     if(app.gameState in {'main', 'paused'}):
@@ -2187,18 +2230,25 @@ def onKeyRelease(app,key):
 
 def onMousePress(app,mouseX,mouseY,button):
     if(app.gameState == 'main'):
+
+        if(app.printMouseScreenSector):
+            getMouseScreenSector(app,mouseX,mouseY)
+            print(app.mouseScreenSector)
+
         # testing lighting engine
         # app.lightSources.append(lightSource(2,255,(mouseX/app.lightmapScalingFactor),(mouseY/app.lightmapScalingFactor),(mouseY/app.lightmapScalingFactor),0.95))
         # if(button == 0):
         #     chargeSpell(app,'testLightSpell')
         
-        if((button == 0) and (len(app.spellData['aggressive'].activeSpell) == 1)):
+        if((button == 0) and (len(app.spellData['aggressive'].activeSpell) == 1) and app.spellOrbCharged):
             # print('iniating aggressive spell cast')
             app.playerManaRechargeCounter = 0
             initiateSpellCast(app,app.spellData['aggressive'].activeSpell[0].name,mouseX,mouseY)
-        elif((button == 2) and (len(app.spellData['defensive'].activeSpell) == 1)):
+        elif((button == 2) and (len(app.spellData['defensive'].activeSpell) == 1) and app.spellOrbCharged):
+            print('bleh')
             # print('iniating defensive spell cast')
             app.playerManaRechargeCounter = 0
+            getMouseScreenSector(app,mouseX,mouseY)
             initiateSpellCast(app,app.spellData['defensive'].activeSpell[0].name,mouseX,mouseY)
 
     elif(app.gameState == 'menu'):
@@ -2211,9 +2261,6 @@ def onMousePress(app,mouseX,mouseY,button):
         if((playButtonLeft < mouseX < playButtonRight) and (playButtonTop < mouseY < playButtonBottom)):
             app.gameState = 'startCutscene'
             
-def onMouseRelease(app,mouseX,mouseY):
-    pass
-
 def onMouseMove(app,mouseX,mouseY):
     if(app.gameState == 'main'):
         for spellType in app.spellTypes:
@@ -2296,7 +2343,7 @@ def redrawAll(app):
         if(app.transparencyTest):
             transparencyTest(app)
         if(app.displayScreenZones):
-            displayScreenZones(app)
+            displaySectors(app)
         if(app.displayShieldPositions):
             displayShieldPositions(app)
         if(app.tempDisplayReadout):
@@ -2341,11 +2388,9 @@ def redrawAll(app):
     drawGui(app) 
 
 # GAME SETUP
-
 def gameSetup(app):
 
     # ---- WINDOW SETUP ----
-
     # establishing screen width
     app.screenWidth = 1000
     app.screenHeight = 750
@@ -2362,7 +2407,6 @@ def gameSetup(app):
     app.background = "blue"
 
     # ---- TILEABLE IMAGE SETUP ----
-
     # establishing tileable image class
     class TileableImage:
         def __init__(self):
@@ -2445,7 +2489,6 @@ def gameSetup(app):
         platformY -= platformHeight
 
     # ---- PHYSICS SETUP ----
-
     # initiating the physics class
     class Physics:
         def __init__(self):
@@ -2462,12 +2505,10 @@ def gameSetup(app):
             self.gravity = 0
 
     # ---- HITBOX SETUP ----
-
     # initializing hitbox dictionary
     app.hitbox = dict()
 
     # ---- PLAYER SETUP ----
-
     # initiating player object
     class PlayerObject:
         def __init__(self):
@@ -2479,6 +2520,8 @@ def gameSetup(app):
             self.yOffset = 0
             self.centerX = 0
             self.centerY = 0
+            self.headX = 0
+            self.headY = 0
 
     app.playerObject = PlayerObject
 
@@ -2495,6 +2538,8 @@ def gameSetup(app):
     app.playerObject.yPosition = int((app.screenHeight-app.playerObject.displayHeight)/2)
     app.playerObject.centerX = app.playerObject.xPosition + (app.playerObject.displayWidth // 2)
     app.playerObject.centerY = app.playerObject.yPosition + (app.playerObject.displayHeight // 2)
+    app.playerObject.headX = app.screenWidth//2
+    app.playerObject.headY = app.playerObject.yPosition + int(app.playerObject.displayHeight/10) 
 
     # sets first player image to show
     app.playerImageIndex = [0,0,-1]
@@ -2581,7 +2626,6 @@ def gameSetup(app):
     app.sPressed = False
     
     # ---- SPELL ORB SETUP ----
-
     # establshing charged state of spell orb
     app.spellOrbCharged = False
 
@@ -2636,8 +2680,8 @@ def gameSetup(app):
             self.imageWidth = imageWidth
             self.imageHeight = imageHeight
             self.imageScale = imageScale
-            self.displayWidth = 0
-            self.displayHeight = 0
+            self.displayWidth = int(imageWidth * imageScale)
+            self.displayHeight = int(imageHeight * imageScale)
             self.displayAngle = 0
             self.xPosition = 0
             self.yPosition = 0
@@ -2679,7 +2723,7 @@ def gameSetup(app):
     app.spells['testBall'].directional = True
     app.spells['levelOneSlimeBall'] = Spell('aggressive','grtf','levelOneSlimeBall','mapProjectile',1,250,250,0.1,10,10)
     app.spells['levelOneSlimeBall'].projectileType = 'groundbounce'
-    app.spells['shield'] = Spell('defensive','zr','shield','shield',1,250,250,0.1,5,0)
+    app.spells['shield'] = Spell('defensive','zr','shield','shield',1,250,250,0.25,5,0)
     app.spells['ghostSword'] = Spell('aggressive','1','ghostSword','mapProjectile',1,250,250,0.5,0,10) # final combo will be 1g43t
     app.spells['ghostSword'].projectileType = 'linear'
     # establishing signifier that tells which side of the screen the mouse is on
@@ -2688,16 +2732,20 @@ def gameSetup(app):
     # initiating combo in progress tracker
     app.comboInProgress = ''
 
+    # setting up spell cancel combo
+    # NO OTHER COMBO SHOULD START WITH THE SAME LETTER AS THE CANCEL COMBO
+    # this allows combo detection to work properly
+    app.cancelCombo = 'ff'
+
     # establishing general spell casting tracker
     app.castingSpell = False
-
 
     # setting up dictionary of shield positions depending on its alignment
     # positions are stored as tuples in the form (x,y), and are determined
     # using trigonometry
-    potentialAlignments = ['left','upLeft','up','upRight','right','down']
+    potentialAlignments = ['ssLeft','ssUpLeft','ssUp','ssUpRight','ssRight','ssDown']
     app.shieldPositions = dict()
-
+    
     # preparing for calculations:
     # setting up shield offset from player
     shieldOffset = 50
@@ -2714,11 +2762,7 @@ def gameSetup(app):
 
     # ---- PROJECTILE SETUP ----
 
-    # initilzing BASE projectile class
-    # --> DONE GLOBALLY     
-
-    # initialzing linear projectile class - moves in a straight line
-    # --> DONE GLOBALLY         
+   # PROJECTILE CLASSES ARE ESTABLISHED GLOBALLY  
 
     # initializing projectile dictionary
     app.projectile = dict()
@@ -2731,7 +2775,6 @@ def gameSetup(app):
     app.activePlayerProjectiles = []
 
     # ---- LIGHTING SETUP ----
-
     # initliaizing light source class
     # --> DONE GLOBALLY
     
@@ -2791,7 +2834,8 @@ def gameSetup(app):
     app.spellScrollBottomYPosition = (app.screenHeight-5)
     app.spellScrollTopYPosition = int(app.screenHeight*0.0625) 
     app.gui['spellScroll'] = GuiElement('images/GUI/spellScroll.png',app.screenWidth,app.spellScrollBottomYPosition,500,1000,0.75,100,'top-right')
-    
+    app.gui['pauseText'] = GuiElement('images/GUI/pauseText.png',(app.screenWidth//2),(app.screenHeight//2),500,500,1,100,'center')
+
     # setting opacities for certain gui elements
     app.startCutsceneOverlayOpacity = 0
     app.deathCutsceneOverlayOpacity = 0
@@ -2834,34 +2878,48 @@ def gameSetup(app):
     # ---- SCREEN SECTOR SETUP ----
     # six screen sectors, ssDown, ssLeft, ssRight, ssUpLeft, ssUpRight, ssUp
 
-    # x and y coordinates of player's head
-    app.playerHeadX = app.screenWidth//2
-    app.playerHeadY = app.playerObject.yPosition + int(app.playerObject.displayHeight/10) 
+    # establishing the angles associated with each of the screen sectors
+    # the angles are attributed according to a counterclockwise rotation
+    # such that each sector can be described as the area covered by a line
+    # swept counterclockwise, starting at the first angle and ending at the
+    # second angle. 
+
+    # this angular definition system was suggested by Professor Mike Taylor
+
+    # the angles, along with the apropriate names for the sectors, are stored
+    # in a dictionary
+    app.sectorAngles = dict()
+
+    # map of relative angle locations
+    #                ssUp
+    #      ssUpRight      ssUpLeft
+    # ssRight                    ssLeft  - this is where 0 degrees is
+    #               ssDown
+    #      this is where 90 degrees is
+
+    # setting angles (in degrees)
+    # the reason I am referencing a bunch of the other angles already set
+    # is so that you only have to change as few values as possible to 
+    # influence the overall divisions of the screen sectors
+    # the only values you have to change are the two in ssLeft and the last one
+    # in ssUpLeft. All the other values are either mirrored, or can be 
+    # found through subtraction, so I wrote the code to autofill them
+    # all values should be justified such that they are within 0 - 360
+    app.sectorAngles['ssLeft'] = [40,340]
+    app.sectorAngles['ssUpLeft'] = [app.sectorAngles['ssLeft'][1],300]
+    app.sectorAngles['ssUp'] = [app.sectorAngles['ssUpLeft'][1],(360 + 180 - app.sectorAngles['ssUpLeft'][1])]
+    app.sectorAngles['ssUpRight'] = [app.sectorAngles['ssUp'][1],(360 + 180 - app.sectorAngles['ssUpLeft'][0])]
+    app.sectorAngles['ssRight'] = [(360 + 180 - app.sectorAngles['ssLeft'][1]),(180 - app.sectorAngles['ssLeft'][0])]
+    app.sectorAngles['ssDown'] = [(180 - app.sectorAngles['ssLeft'][0]),app.sectorAngles['ssLeft'][0]]
+    for sector in app.sectorAngles:
+        ptc('sector',sector)
+        ptc('angles',app.sectorAngles[sector])
     
-    # screen coordinates
-    screenLeft = app.screenWidth
-    screenRight = 0
-    screenTop = 0
-    screenBottom = app.screenHeight
-
-    # establishing sector bounding coordinates
-
-    # RE ESTABLISH TO BE BASED OFF OF DISTINCT ANGLES RATHER THAN MUTLIPLES OF SCREEN WIDTH AND HEIGHT
-    # borders at 30deg, 65 deg, etc... <-- an example
-    app.ssDownWidth = int(app.screenWidth * 0.8)
-    app.ssDownLeftBound = (app.playerHeadX+(app.ssDownWidth//2))
-    app.ssDownRightBound = (app.playerHeadX-(app.ssDownWidth//2))
-    app.ssLeftAndRightTopBound = int(app.screenHeight * 0.3)
-    app.ssLeftAndRightWidth = int(app.screenWidth * 0.4)
-    app.ssLeftAndRightLeftBound = app.playerHeadX+(app.ssLeftAndRightWidth//2)
-    app.ssLeftAndRightRightBound = app.playerHeadX-(app.ssLeftAndRightWidth//2)
-
     # setting up screen sector indicator
-    app.curentScreenSector = 'right'
+    app.mouseScreenSector = 'ssRight'
 
     # ---- SCREEN SHAKE SETUP ----
-
-    # actually dictates the magnitude of the screen shake currently applied
+    # dictates the magnitude of the screen shake currently applied
     app.screenShakeMagnitude = 0
     
     # indicates the x and y offsets of the screen shake
@@ -2873,7 +2931,6 @@ def gameSetup(app):
     app.screenShakeDissapationSpeed = 5
     
     # ---- ENEMY SETUP ----
-
     # initializing enemies dictionary
     app.enemies = dict()
     
@@ -2906,7 +2963,6 @@ def gameSetup(app):
     app.setGravity = -150
 
     # ---- GAME STATE SETUP ----
-
     # initializing game state
     # current available game states are:
     # - 'menu'
@@ -2915,17 +2971,15 @@ def gameSetup(app):
     # - 'dead'
     # - 'paused'
     # the game starts in the menu state
-    app.gameState = 'main'
+    app.gameState = 'menu'
 
     app.currentBoss = None
 
     # ---- APP SETUP ----
-
     # setting the framerate
     app.stepsPerSecond = 60
 
     # ---- TEMP DEBUG ----
-
     # misc testing setup
     # app.testWalkSpeed = 10
     # app.screenLeft = 100
@@ -2944,8 +2998,11 @@ def gameSetup(app):
 
     app.displayShieldPositions = False
 
-    # Finalization - run the contents of appStep to update everything prior 
-    # to running. DO NOT RUN onStep() ITSELF!
+    app.printMouseScreenSector = False
+
+    # ---- FINALIZATION ----
+    # calling several of the update functions, to ensure everything is
+    # set up prior to the first draw call
     updatePlayerImage2(app)
     for tileableImageName in app.tileableImageList:
         updateTiles(app, tileableImageName)
@@ -2961,11 +3018,10 @@ def appSetup(app):
     gameSetup(app)
 
 # MAIN()
-
 def main():
     appSetup(app)
     runApp(width = app.screenWidth, height = app.screenHeight)
 
 main()
 
-# total hours spent working here: ~82
+# total hours spent working here: ~87

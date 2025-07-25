@@ -8,13 +8,10 @@
 # ADD HEALTH REGAIN AND MANA REGAIN ITEMS
 # VIDEO IS VERY IMPORTANT!!! WORK ON VIDEO!!!! WRITE DOWN KEY FEATURES OF CODE I WANT TO POINT OUT IN VIDEO
 # CONTINUE WORKING ON COLLISION SYSTEM (still need angled rectangles)
-# ADD SUPPORT FOR EXTERNAL FORCES IN PHYSICS SYSTEM (maybe)
-# DRAW TEXT FOR PAUSE
-# ADDRESS SHIFT KEY ISSUE
-# binary search for walls and collisions? (make sure you don't overshoot)
 # name wizard - Wizard Bossfight, firstname Wizard, lastname Bossfight
 
 # QUESTIONS FOR PROF TAYLOR:
+# HOW TO DO ANGLED RECTANGLE COLLISIONS
 # BETTER WAY TO DEAL WITH THE EIGHT DIFFERENT INPUT VALUES FOR ANGLED RECTANGLE
 # ASK ABOUT HITBOXES AND CLASS PROJECTILE
 # ASK ABOUT SHIFT KEY ISSUE???
@@ -34,7 +31,10 @@ from PIL import Image
 import math
 # numpy used for matrix transformations in lighting engine
 import numpy
+# random used for screenshake
 import random
+# copy used for copying lists
+import copy
 
 # CLASSES
 # ---- LIGHTING ----
@@ -294,6 +294,12 @@ class Enemy:
         self.facing = 'right'
         self.deleteMe = False
 
+class InsidiousCreature(Enemy):
+    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit):
+        super().__init__(name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit)
+        self.behaviors = ['stationary','chase']
+        self.behavioralMode = 'stationary'
+
 class TheHideousBeast(Enemy):
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit):
         super().__init__(name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit)
@@ -347,6 +353,49 @@ class TheHideousBeast(Enemy):
             app.playerHealth == 100
             self.deleteMe = True
 
+# ---- SIMPLE ANIMATION ----
+class SimpleAnimation:
+    def __init__(self,frameList,animationSpeed,relativeToMap,displayWidth,displayHeight,rotation,alignment,xPosition,yPosition,fade,fadeRate):
+        self.frameList = frameList
+        self.animationSpeed = animationSpeed
+        self.relativeToMap = relativeToMap
+        self.displayWidth = displayWidth
+        self.displayHeight = displayHeight
+        self.rotation = rotation
+        self.alignment = alignment
+        self.xPosition = xPosition
+        self.yPosition = yPosition
+        self.xOffset = 0
+        self.yOffset = 0
+        self.currentFramePath = ''
+        self.frameOn = 0
+        self.counter = 0
+        self.fade = fade
+        self.fadeRate = fadeRate
+        self.opacity = 100
+    def update(self,app):
+        if((self.counter % self.animationSpeed) == 0):
+            self.counter = 0
+            if(self.frameOn == len(self.frameList)):
+                app.simpleAnimations.remove(self)
+                return
+            else:
+                self.currentFramePath = self.frameList[self.frameOn]
+                self.frameOn += 1
+        self.counter += 1
+        if(self.fade):
+            self.opacity = max((self.opacity - self.fadeRate), 0)
+        if(self.relativeToMap):
+            self.xOffset -= app.player['x'].currentVelocity
+            self.yOffset = app.ti['ground'].yOffset
+
+    def draw(self,app):
+        x = self.xPosition + self.xOffset + app.screenShakeX
+        y = self.yPosition + self.yOffset + app.screenShakeY
+        # ptc('x',x)
+        # ptc('y',y)
+        drawImage(self.currentFramePath,x,y,width = self.displayWidth, height = self.displayHeight, rotateAngle = self.rotation, align = self.alignment, opacity = self.opacity)
+        
 # ---- HITBOXES ----
 class Hitbox:
     def __init__(self):
@@ -378,13 +427,16 @@ class HitboxRect(Hitbox):
         self.xAdjustment = 0
         self.yAdjustment = 0
 
+    def getVertList(self):
+        return [[self.left,self.bottom],[self.right,self.bottom],[self.right,self.top],[self.left,self.top]]
+
     def align(self,other):
-        self.left = other.xPosition - (other.displayWidth//2) + self.xAdjustment
-        self.right = other.xPosition + (other.displayWidth//2) - self.xAdjustment
-        self.top = other.yPosition - (other.displayHeight//2) + self.yAdjustment
-        self.bottom = other.yPosition + (other.displayHeight//2) - self.yAdjustment
-        self.xOffset = other.xOffset
-        self.yOffset = other.yOffset
+        self.left = (other.xPosition - (other.displayWidth//2) + self.xAdjustment)
+        self.right = (other.xPosition + (other.displayWidth//2) - self.xAdjustment)
+        self.top = (other.yPosition - (other.displayHeight//2) + self.yAdjustment)
+        self.bottom = (other.yPosition + (other.displayHeight//2) - self.yAdjustment)
+        self.xOffset = int(other.xOffset)
+        self.yOffset = int(other.yOffset)
 
 class HitboxAngledRect(Hitbox):
     def __init__(self,x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4):
@@ -399,24 +451,28 @@ class HitboxAngledRect(Hitbox):
         self.y_4 = y_4
 
     def align(self,other):
-        self.x_1 += other.xVelocity
-        self.y_1 += other.yVelocity
-        self.x_2 += other.xVelocity
-        self.y_2 += other.yVelocity
-        self.x_3 += other.xVelocity
-        self.y_3 += other.yVelocity
-        self.x_4 += other.xVelocity
-        self.y_4 += other.yVelocity
-        self.xOffset = other.xOffset
-        self.yOffset = other.yOffset
-
+        if(isinstance(other,Projectile)):
+            self.x_1 = (self.x_1 + other.xVelocity)
+            self.y_1 = (self.y_1 + other.yVelocity)
+            self.x_2 = (self.x_2 + other.xVelocity)
+            self.y_2 = (self.y_2 + other.yVelocity)
+            self.x_3 = (self.x_3 + other.xVelocity)
+            self.y_3 = (self.y_3 + other.yVelocity)
+            self.x_4 = (self.x_4 + other.xVelocity)
+            self.y_4 = (self.y_4 + other.yVelocity)
+            self.xOffset = int(other.xOffset)
+            self.yOffset = int(other.yOffset)
+    
+    def getVertList(self):
+        return [[int(self.x_1),int(self.y_1)],[int(self.x_2),int(self.y_2)],[int(self.x_3),int(self.y_3)],[int(self.x_4),int(self.y_4)]]
+    
     def __hash__(self):
         return hash(str(self))
 
     def __eq__(self,other):
         selfList = [self.x_1,self.y_1,self.x_2,self.y_2,self.x_3,self.y_3,self.x_4,self.y_4]
         otherList = [other.x_1,other.y_1,other.x_2,other.y_2,other.x_3,other.y_3,other.x_4,other.y]
-        return (isinstance(other,HitboxAngledRect)) and (selfList == otherList)
+        return (isinstance(other,HitboxAngledRect)) and ([int(i) for i in selfList] == [int(i) for i in otherList])
 
 # DEBUG/TESTING FUNCTIONS
 # temporary transparency test function
@@ -463,9 +519,9 @@ def displaySectors(app):
 
 # temporary function for display anticipated shield positions
 def displayShieldPositions(app):
-    for direction in app.shieldPositions:
-        x = app.shieldPositions[direction][0]
-        y = app.shieldPositions[direction][1]
+    for direction in app.shieldData:
+        x = app.shieldData[direction][0]
+        y = app.shieldData[direction][1]
         drawCircle(x,y,10,fill='red')
 
 # temporary function for debugging, displays the values of certain variables
@@ -484,22 +540,75 @@ def tempDisplayReadout(app,inputList):
 
 # GENERAL HELPER FUNCTIONS
 
-def applyRectangleRotation(app,centerX,centerY,width,height,rotationAngle):
+def checkConvexPolygonIntersection(vertexList_1,vertexList_2):
+    # Polygon intersection referenced from https://www.gorillasun.de/blog/an-algorithm-for-polygon-intersections/
+    # and implementation guided by Professor Mike Taylor and TA Nathan Xie
+    insideRect = False
+    for checkPoint in vertexList_1:
+        # setting the x and y position of the point we are checking
+        checkX = checkPoint[0]
+        checkY = checkPoint[1]
+        insideRect = False
+        
+        i = 0
+        j = len(vertexList_2) -1
+
+        while(i < len(vertexList_2)):
+            # breaking up the polygon into it's line segments
+            xI = vertexList_2[i][0]
+            yI = vertexList_2[i][1]
+            xJ = vertexList_2[j][0]
+            yJ = vertexList_2[j][1]
+            # checking whether the 'ray' we cast from the point intersects
+            # with the line segment we have determined
+            # it is not a real ray, we simply use two mathemtical formulae
+            # to approximate the effect of a ray.
+            # we first check if the y value of the point is within 
+            # the range of the y values of the line segment
+            # and then check, using another equation, whether the point 
+            # should be inside our polygon. 
+            # this equation is described in detail at the following link:
+            # https://math.stackexchange.com/questions/274712/calculate-on-which-side-of-a-straight-line-is-a-given-point-located/274728#274728
+            # print('yI:',yI,' checkY:',checkY,' yJ:',yJ)
+            # print('check 1:',(yI > checkY) != (yJ > checkY))
+            dy = (yJ - yI)
+            if(dy == 0):
+                dy = 0.001
+            # print('check 2:',(checkX < ((((xJ - xI) * (checkY - yI)) / dy) + xI)))
+            intersection = (((yI > checkY) != (yJ > checkY)) and (checkX < ((((xJ - xI) * (checkY - yI)) / dy) + xI)))
+            # if an intersection is detected, then flip the inside variable
+            # this essentially counts whether our interesections are even
+            # or odd. The cumulative effects of this flipping will detail
+            # whether the point is inside the polygon or not, as described
+            # by the Jordan curve theorem, which is detailed here:
+            # https://en.wikipedia.org/wiki/Jordan_curve_theorem?ref=gorillasun.de
+            # in addition to being utilized by the original website
+            if(intersection): 
+                insideRect = not insideRect
+            # indexing the bounds to select the next line segment
+            i += 1
+            j = i-1
+        if(insideRect):
+            return insideRect
+    return False
+
+def applyRectangleRotation(centerX,centerY,width,height,rotationAngle):
     radAngle = math.radians(rotationAngle)
     # settign up coordinates
-    # (x_1,y_1) --- (x_2,y_2)
-    #     |             |
     # (x_4,y_4) --- (x_3,y_3)
+    #     |             |    
+    # (x_1,y_1) --- (x_2,y_2)
+
     x_1I = x_4I = -width//2
     x_2I = x_3I = width//2 
-    y_1I = y_2I = -height//2
-    y_3I = y_4I = height//2
+    y_1I = y_2I = height//2
+    y_3I = y_4I = -height//2
     # rectangle rotation formula reference from https://www.gorillasun.de/blog/an-algorithm-for-polygon-intersections/#drawing-rotated-rectangles
     initialPointSet = [(x_1I,y_1I),(x_2I,y_2I),(x_3I,y_3I),(x_4I,y_4I)]
     finalPointSet = []
     for point in initialPointSet:
-        finalX = centerX + ((point[0] * math.cos(radAngle)) - (point[1] * math.sin(radAngle)))
-        finalY = centerY + ((point[0] * math.sin(radAngle)) + (point[1] * math.cos(radAngle)))
+        finalX = (centerX + ((point[0] * math.cos(radAngle)) - (point[1] * math.sin(radAngle))))
+        finalY = (centerY + ((point[0] * math.sin(radAngle)) + (point[1] * math.cos(radAngle))))
         finalPointSet.append((finalX,finalY))
     # ptc('finalPointSet',finalPointSet)
     return finalPointSet
@@ -565,10 +674,10 @@ def getMouseScreenSector(app,mouseX,mouseY):
         mouseAngle += 360
     currentScreenSector = None
     # ptc('mouseAngle',mouseAngle)
-    # the only sector that must be checked manually is ssLeft, since it
+    # the only sector that must be checked manually is ssRight, since it
     # crosses 0 degrees. all the other sectors can be checked in a loop
-    if((0 <= mouseAngle < app.sectorAngles['ssLeft'][0]) or (app.sectorAngles['ssLeft'][1] <= mouseAngle <= 360)):
-       currentScreenSector = 'ssLeft'
+    if((0 <= mouseAngle < app.sectorAngles['ssRight'][0]) or (app.sectorAngles['ssRight'][1] <= mouseAngle <= 360)):
+       currentScreenSector = 'ssRight'
     else:
         for sector in app.sectorAngles:
             sectorAngle_1 = app.sectorAngles[sector][0]
@@ -1392,6 +1501,8 @@ def chargeSpell(app,spellName):
     app.spellData[spellType].activeSpell = [app.spells[spellName]]
     app.spellOrbCharged = True
     app.spellData[spellType].drawingSpell = False
+    app.spells[spellName].xPosition = 0
+    app.spells[spellName].yPosition = 0
 
 # enables the spell casting animation itself, and calculates the apropriate 
 # angle for the spell animation to cast
@@ -1434,9 +1545,17 @@ def initiateSpellCast(app,spellName,targetX,targetY):
     # shield spell
     elif(app.spells[spellName].displayType == 'shield'):
         # pick shield alignment depending on which sector of the screen the mouse is in
-        print(app.mouseScreenSector)
-        app.spells[spellName].xPosition = app.shieldPositions[app.mouseScreenSector][0]
-        app.spells[spellName].yPosition = app.shieldPositions[app.mouseScreenSector][1]
+        # print(app.mouseScreenSector)
+        app.spells[spellName].xPosition = app.shieldData[app.mouseScreenSector][0]
+        app.spells[spellName].yPosition = app.shieldData[app.mouseScreenSector][1]
+        hitboxRotationAngle = app.shieldData[app.mouseScreenSector][2]
+        width = int(app.spells[spellName].displayWidth * 0.2)
+        height = int(app.spells[spellName].displayHeight * 0.9)
+        [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(app.spells[spellName].xPosition, app.spells[spellName].yPosition, width, height, hitboxRotationAngle)
+        app.hitbox[spellName] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4)
+        h = app.hitbox[spellName]
+        h.associatedObject = app.spells[spellName]
+        h.belongsTo = 'player'
     # projectile-based spells
     elif((app.spells[spellName].displayType in app.projectileTypeList)):
         # get initial data from spell setup
@@ -1504,28 +1623,34 @@ def castSpell(app,spellName):
             app.spells[spellName].animationCounter = 0
             app.spellData[spellType].drawingSpell = False
             app.spellData[spellType].spellCastingEnabler = False
-            app.spellData[spellType].activeSpell = {}
+            app.spellData[spellType].activeSpell = []
             return
     elif(app.spells[spellName].displayType == 'shield'):
         app.spells[spellName].animationCounter = 0
         spellDirection = app.mouseScreenSector
+        if(app.removeShield):
+            activateSpellEffect(app,spellName)
+            app.spellData[spellType].drawingSpell = False
+            app.spellData[spellType].spellCastingEnabler = False
+            app.spellData[spellType].activeSpell = []
+            del app.hitbox[spellName]
+            app.removeShield = False
     elif(app.spells[spellName].displayType in app.projectileTypeList):
         if((spellName not in app.activePlayerProjectiles) and (spellName not in app.activeMapProjectiles)):
             app.spells[spellName].animationCounter = 0
             app.spellData[spellType].drawingSpell = False
             app.spellData[spellType].spellCastingEnabler = False
-            app.spellData[spellType].activeSpell = {}
+            app.spellData[spellType].activeSpell = []
             return
         else:
             app.spells[spellName].animationCounter %= app.spells[spellName].animationFrames
             if(app.spells[spellName].projectileType in {'linear','pointHoming','groundbounce'}):
                 endCondition = app.projectile[spellName].move()
                 if(endCondition):
-                    activateSpellEffect(app,spellName)
                     app.spells[spellName].animationCounter = 0
                     app.spellData[spellType].drawingSpell = False
                     app.spellData[spellType].spellCastingEnabler = False
-                    app.spellData[spellType].activeSpell = {}
+                    app.spellData[spellType].activeSpell = []
                     app.projectile[spellName].deleteMe = True
                     return
             # determining spell travel direction, if it has different animations
@@ -1563,8 +1688,16 @@ def drawSpell(app,spellName):
 def activateSpellEffect(app,spellName):
     if(spellName == 'testLightSpell'):
         app.lightSources.append(LightSource(3,255,(app.spells[spellName].targetX/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),0.95))
-    if(spellName == 'testBall'):
+    elif(spellName == 'testBall'):
         print('YIPPEE!!')
+    elif(spellName == 'levelOneSlimeBall'):
+        frameList = ['images/spells/levelOneSlimeBallEndAnimation_0.png','images/spells/levelOneSlimeBallEndAnimation_1.png','images/spells/levelOneSlimeBallEndAnimation_2.png']
+        displayWidth = app.spells[spellName].displayWidth
+        displayHeight = app.spells[spellName].displayHeight
+        rotation = app.spells[spellName].displayAngle
+        xPosition = app.spells[spellName].xPosition
+        yPosition = app.spells[spellName].yPosition
+        app.simpleAnimations.append(SimpleAnimation(frameList,3,True,displayWidth,displayHeight,rotation,'center',xPosition,yPosition,True,10))
 
 # PROJECTILE MANAGEMENT
 def drawProjectile(app,projectileName):
@@ -1581,10 +1714,12 @@ def drawProjectile(app,projectileName):
 def updateProjectiles(app):
     # update active map projectiles
     for projectileName in app.activeMapProjectiles:
-        if(not app.projectile[projectileName].isPlayerSpell):
-            pass
-            # actually update projectile state
         if(app.projectile[projectileName].deleteMe):
+            if(app.projectile[projectileName].isPlayerSpell):
+                app.spells[projectileName].xPosition = app.projectile[projectileName].xPosition + app.projectile[projectileName].xOffset
+                app.spells[projectileName].yPosition = app.projectile[projectileName].yPosition
+                app.spells[projectileName].displayAngle = app.projectile[projectileName].displayAngle
+                activateSpellEffect(app,projectileName)
             app.activeMapProjectiles.remove(projectileName)
             del app.projectile[projectileName]
             print('removed map projectile:',projectileName)
@@ -1592,10 +1727,12 @@ def updateProjectiles(app):
             print('also removed hitbox', projectileName)
     # update active player projectiles
     for projectileName in app.activePlayerProjectiles:
-        if(not app.projectile[projectileName].isPlayerSpell):
-            pass
-            # actually update projectile state
         if(app.projectile[projectileName].deleteMe):
+            if(app.projectile[projectileName].isPlayerSpell):
+                app.spells[projectileName].xPosition = app.projectile[projectileName].xPosition
+                app.spells[projectileName].yPosition = app.projectile[projectileName].yPosition
+                app.spells[projectileName].displayAngle = app.projectile[projectileName].displayAngle
+                activateSpellEffect(app,projectileName)
             app.activePlayerProjectiles.remove(projectileName)
             del app.projectile[projectileName]
             print('removed player projectile:', projectileName)
@@ -1857,7 +1994,7 @@ def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,h
         else:
             rotationAngle = math.degrees(math.asin((-dy)/distance))
         # ptc('rotationAngle',rotationAngle)
-        [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(app, centerX, centerY, width, height, rotationAngle)
+        [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(centerX, centerY, width, height, rotationAngle)
         app.hitbox[name] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4)
         h = app.hitbox[name]
         h.associatedObject = associatedObject
@@ -1896,7 +2033,7 @@ def displayHitbox(app,hitbox):
         drawRect(x, y, width, height, fill = None, border = 'red')
     elif(isinstance(hitbox,HitboxAngledRect)):
         # how can i NOT have to pass these many things in!
-        drawPolygon((hitbox.x_1 + hitbox.xOffset), (hitbox.y_1 + hitbox.yOffset), (hitbox.x_2 + hitbox.xOffset), (hitbox.y_2 + hitbox.yOffset), (hitbox.x_3 + hitbox.xOffset), (hitbox.y_3 + hitbox.yOffset), (hitbox.x_4 + hitbox.xOffset), (hitbox.y_4 + hitbox.yOffset), fill = None, border = 'darkGreen')
+        drawPolygon((hitbox.x_1 + hitbox.xOffset), (hitbox.y_1 + hitbox.yOffset), (hitbox.x_2 + hitbox.xOffset), (hitbox.y_2 + hitbox.yOffset), (hitbox.x_3 + hitbox.xOffset), (hitbox.y_3 + hitbox.yOffset), (hitbox.x_4 + hitbox.xOffset), (hitbox.y_4 + hitbox.yOffset), fill = None, border = 'magenta')
     else:
         reportError('attempting to display hitbox','UNRECOGNIZED HITBOX TYPE','displayHitbox','recieved hitbox type',type(hitbox),None)
 
@@ -1983,30 +2120,66 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
             # print('both rectangles')
             pass
     elif(collisionType == {'hitboxAngledRect'}):
-        # print('both angled rectangles')
-        pass
+        hVertList_1 = []
+        for i in hitbox_1.getVertList():
+            hVertList_1.append([(i[0] + hitbox_1.xOffset),(i[1] + hitbox_1.yOffset)])
+        hVertList_2 = []
+        for i in hitbox_2.getVertList():
+            hVertList_2.append([(i[0] + hitbox_2.xOffset),(i[1] + hitbox_2.yOffset)])
+        if(checkConvexPolygonIntersection(hVertList_1,hVertList_2) or checkConvexPolygonIntersection(hVertList_2,hVertList_1)):
+            print('contact')
+            pass        
     elif(collisionType == {'hitboxCircle', 'hitboxRect'}):
         if(isinstance(hitbox_1,HitboxCircle)):
-            hitbox_circle = hitbox_1
-            hitbox_rect = hitbox_2
+            hitboxCircle = hitbox_1
+            hitboxRect = hitbox_2
         else:
-            hitbox_circle = hitbox_2
-            hitbox_rect = hitbox_1
-        left = hitbox_rect.left - hitbox_circle.radius + hitbox_rect.xOffset
-        right = hitbox_rect.right + hitbox_circle.radius + hitbox_rect.xOffset
-        top = hitbox_rect.top - hitbox_circle.radius + hitbox_rect.yOffset
-        bottom = hitbox_rect.bottom + hitbox_circle.radius + hitbox_rect.yOffset
-        x = hitbox_circle.xPosition + hitbox_circle.xOffset
-        y = hitbox_circle.yPosition + hitbox_circle.yOffset
+            hitboxCircle = hitbox_2
+            hitboxRect = hitbox_1
+        left = hitboxRect.left - hitboxCircle.radius + hitboxRect.xOffset
+        right = hitboxRect.right + hitboxCircle.radius + hitboxRect.xOffset
+        top = hitboxRect.top - hitboxCircle.radius + hitboxRect.yOffset
+        bottom = hitboxRect.bottom + hitboxCircle.radius + hitboxRect.yOffset
+        x = hitboxCircle.xPosition + hitboxCircle.xOffset
+        y = hitboxCircle.yPosition + hitboxCircle.yOffset
         if((left <= x <= right) and (top <= y <= bottom)):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
             # print('one circle, one rectangle')
     elif(collisionType == {'hitboxCircle', 'hitboxAngledRect'}):
-        # print('one circle, one angled rectangle')
-        pass
+        if(isinstance(hitbox_1,HitboxCircle)):
+            hitboxCircle = hitbox_1
+            hitboxAngledRect = hitbox_2
+        else:
+            hitboxCircle = hitbox_2
+            hitboxAngledRect = hitbox_1
+        hARVertList = []
+        for i in hitboxAngledRect.getVertList():
+            hARVertList.append([(i[0] + hitboxAngledRect.xOffset),(i[1] + hitboxAngledRect.yOffset)])
+        circleVert = [[(hitboxCircle.xPosition + hitboxCircle.xOffset),(hitboxCircle.yPosition + hitboxCircle.yOffset)]] 
+        if(checkConvexPolygonIntersection(circleVert,hARVertList)):
+            print('contact')
     elif(collisionType == {'hitboxRect', 'hitboxAngledRect'}):
-        # print('one rectangle, one angled rectangle')
-        pass
+        if(isinstance(hitbox_1,HitboxRect)):
+            hitboxRect = hitbox_1
+            hitboxAngledRect = hitbox_2
+        else:
+            hitboxRect = hitbox_2
+            hitboxAngledRect = hitbox_1
+
+        hARVertList = []
+        # print('hAR before:',hARVertList)
+        for i in hitboxAngledRect.getVertList():
+            hARVertList.append([(i[0] + hitboxAngledRect.xOffset),(i[1] + hitboxAngledRect.yOffset)])
+        # print('hAR after:',hARVertList)
+
+        hRVertList = []
+        for i in hitboxRect.getVertList():
+            hRVertList.append([(i[0] + hitboxRect.xOffset),(i[1] + hitboxRect.yOffset)])
+        # print(hRVertList)
+   
+        if(checkConvexPolygonIntersection(hARVertList,hRVertList) or checkConvexPolygonIntersection(hRVertList,hARVertList)):
+            print('contact')
+            pass
     else:
         reportError('attempting to run collision calculations','UNRECOGNIZED COLLISION TYPE','runCollisionCalculations','recieved collision type',collisionType,None)
 
@@ -2142,7 +2315,7 @@ def onKeyPress(app,key):
             else:
                 app.gameState = 'paused'
 
-def onKeyHold(app,keys,modifiers):
+def onKeyHold(app,keys):
     if(app.gameState == 'main'):
         # TESTING ONLY - DIRECTLY CHANGE OFFSETS
         # if('d' in keys and not('a' in keys)):
@@ -2217,6 +2390,7 @@ def onKeyHold(app,keys,modifiers):
             app.displaySpellScroll = True
 
 def onKeyRelease(app,key):
+    key = key.lower()
     if(app.gameState == 'main'):
         if((key == 'a') or (key == 'd')):
             app.player['x'].currentThrust = 0
@@ -2244,12 +2418,17 @@ def onMousePress(app,mouseX,mouseY,button):
             # print('iniating aggressive spell cast')
             app.playerManaRechargeCounter = 0
             initiateSpellCast(app,app.spellData['aggressive'].activeSpell[0].name,mouseX,mouseY)
-        elif((button == 2) and (len(app.spellData['defensive'].activeSpell) == 1) and app.spellOrbCharged):
-            print('bleh')
+        elif((button == 2) and (len(app.spellData['defensive'].activeSpell) == 1) and (app.spellData['defensive'].drawingSpell == False) and app.spellOrbCharged):
             # print('iniating defensive spell cast')
             app.playerManaRechargeCounter = 0
             getMouseScreenSector(app,mouseX,mouseY)
+            print('bluh')
             initiateSpellCast(app,app.spellData['defensive'].activeSpell[0].name,mouseX,mouseY)
+            
+            # if button 2 is pressed and the shield spell has already been cast
+            # deactivate shield spell
+        elif((button == 2) and (len(app.spellData['defensive'].activeSpell) == 1) and (app.spellData['defensive'].activeSpell[0].name == 'shield') and (not app.spellOrbCharged)):
+            app.removeShield = True
 
     elif(app.gameState == 'menu'):
         playButtonWidth = int(app.gui['menuPlayButton'].imageWidth * app.gui['menuPlayButton'].imageScale)
@@ -2313,6 +2492,8 @@ def onStep(app):
         if(app.playerImmunityFrames != 0):
             app.playerImmunityFrames -= 1
         updateScreenShake(app)
+        for i in app.simpleAnimations:
+            i.update(app)
 
 def redrawAll(app): 
     if(app.gameState in {'main','paused','dead'}):
@@ -2339,6 +2520,8 @@ def redrawAll(app):
         if(app.displayHitboxes):
             for hitboxName in app.hitbox:
                 displayHitbox(app,app.hitbox[hitboxName])
+        for i in app.simpleAnimations:
+            i.draw(app)
         # temporary readout for variables
         if(app.transparencyTest):
             transparencyTest(app)
@@ -2698,7 +2881,7 @@ def gameSetup(app):
         def __init__(self):
             # setting up the list of currently active spells
             # list should only ever contain a currently active spell or no spells
-            self.activeSpell = {}
+            self.activeSpell = []
             # establishing the spell drawing enabler
             self.drawingSpell = False
             # establishing the spell casting enabler
@@ -2743,8 +2926,8 @@ def gameSetup(app):
     # setting up dictionary of shield positions depending on its alignment
     # positions are stored as tuples in the form (x,y), and are determined
     # using trigonometry
-    potentialAlignments = ['ssLeft','ssUpLeft','ssUp','ssUpRight','ssRight','ssDown']
-    app.shieldPositions = dict()
+    potentialAlignments = ['ssRight','ssUpRight','ssUp','ssUpLeft','ssLeft','ssDown']
+    app.shieldData = dict()
     
     # preparing for calculations:
     # setting up shield offset from player
@@ -2758,7 +2941,10 @@ def gameSetup(app):
         shieldX = app.playerObject.centerX + shieldOffset * math.cos(math.radians(shieldAngle))
         shieldY = app.playerObject.centerY + shieldOffset * math.sin(math.radians(shieldAngle))
         
-        app.shieldPositions[alignment] = (shieldX,shieldY)
+        app.shieldData[alignment] = (shieldX,shieldY,shieldAngle)
+
+    # setting up shield removing indicator
+    app.removeShield = False
 
     # ---- PROJECTILE SETUP ----
 
@@ -2891,9 +3077,9 @@ def gameSetup(app):
     app.sectorAngles = dict()
 
     # map of relative angle locations
-    #                ssUp
-    #      ssUpRight      ssUpLeft
-    # ssRight                    ssLeft  - this is where 0 degrees is
+    #               ssUp
+    #      ssUpLeft      ssUpRight
+    # ssLeft                    ssRight  - this is where 0 degrees is
     #               ssDown
     #      this is where 90 degrees is
 
@@ -2901,16 +3087,16 @@ def gameSetup(app):
     # the reason I am referencing a bunch of the other angles already set
     # is so that you only have to change as few values as possible to 
     # influence the overall divisions of the screen sectors
-    # the only values you have to change are the two in ssLeft and the last one
-    # in ssUpLeft. All the other values are either mirrored, or can be 
+    # the only values you have to change are the two in ssRight and the last one
+    # in ssUpRight. All the other values are either mirrored, or can be 
     # found through subtraction, so I wrote the code to autofill them
     # all values should be justified such that they are within 0 - 360
-    app.sectorAngles['ssLeft'] = [40,340]
-    app.sectorAngles['ssUpLeft'] = [app.sectorAngles['ssLeft'][1],300]
-    app.sectorAngles['ssUp'] = [app.sectorAngles['ssUpLeft'][1],(360 + 180 - app.sectorAngles['ssUpLeft'][1])]
-    app.sectorAngles['ssUpRight'] = [app.sectorAngles['ssUp'][1],(360 + 180 - app.sectorAngles['ssUpLeft'][0])]
-    app.sectorAngles['ssRight'] = [(360 + 180 - app.sectorAngles['ssLeft'][1]),(180 - app.sectorAngles['ssLeft'][0])]
-    app.sectorAngles['ssDown'] = [(180 - app.sectorAngles['ssLeft'][0]),app.sectorAngles['ssLeft'][0]]
+    app.sectorAngles['ssRight'] = [40,340]
+    app.sectorAngles['ssUpRight'] = [app.sectorAngles['ssRight'][1],300]
+    app.sectorAngles['ssUp'] = [app.sectorAngles['ssUpRight'][1],(360 + 180 - app.sectorAngles['ssUpRight'][1])]
+    app.sectorAngles['ssUpLeft'] = [app.sectorAngles['ssUp'][1],(360 + 180 - app.sectorAngles['ssUpRight'][0])]
+    app.sectorAngles['ssLeft'] = [(360 + 180 - app.sectorAngles['ssRight'][1]),(180 - app.sectorAngles['ssRight'][0])]
+    app.sectorAngles['ssDown'] = [(180 - app.sectorAngles['ssRight'][0]),app.sectorAngles['ssRight'][0]]
     for sector in app.sectorAngles:
         ptc('sector',sector)
         ptc('angles',app.sectorAngles[sector])
@@ -2971,9 +3157,13 @@ def gameSetup(app):
     # - 'dead'
     # - 'paused'
     # the game starts in the menu state
-    app.gameState = 'menu'
+    app.gameState = 'main'
 
     app.currentBoss = None
+
+    # ---- SIMPLE ANIMATION SETUP ----
+    # setting up simple animations list
+    app.simpleAnimations = []
 
     # ---- APP SETUP ----
     # setting the framerate
@@ -3024,4 +3214,4 @@ def main():
 
 main()
 
-# total hours spent working here: ~87
+# total hours spent working here: ~92

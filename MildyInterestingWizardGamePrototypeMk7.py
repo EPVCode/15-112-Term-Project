@@ -7,7 +7,8 @@
 # START WORKING ON FINAL BOSS
 # ADD HEALTH REGAIN AND MANA REGAIN ITEMS
 # VIDEO IS VERY IMPORTANT!!! WORK ON VIDEO!!!! WRITE DOWN KEY FEATURES OF CODE I WANT TO POINT OUT IN VIDEO
-# CONTINUE WORKING ON COLLISION SYSTEM (still need angled rectangles)
+# make map bounds?? (maybe)
+# ADD PLAYER HURT - show that player has been hurt somehow, play sound probably
 # name wizard - Wizard Bossfight, firstname Wizard, lastname Bossfight
 
 # QUESTIONS FOR PROF TAYLOR:
@@ -299,6 +300,73 @@ class InsidiousCreature(Enemy):
         super().__init__(name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit)
         self.behaviors = ['stationary','chase']
         self.behavioralMode = 'stationary'
+        self.radius = 0
+        self.phase = 0
+        self.subphase = 0
+        self.subphaseCounter = 0
+        self.playerHoverDistance = 500
+        self.intendedYPosition = 0
+    
+    def move(self,app):
+        if(self.subphase == 'rise'):
+            if(self.yPosition > (app.ti['ground'].initialTileYPosition - 150)):
+                app.icPhysics['y'].currentThrust += 5
+            elif(app.icPhysics['y'].currentThrust > 0):
+                app.icPhysics['y'].currentThrust = app.icPhysics['y'].currentThrust * 0.9
+                if(app.icPhysics['y'].currentThrust < 1):
+                    app.icPhysics['y'].currentThrust = 0
+            else:
+                self.subphase = 'chase'
+        elif(self.subphase == 'chase'):
+            dx = (self.xPosition + self.xOffset) - app.playerObject.xPosition
+            if(dx < -self.playerHoverDistance):
+                app.icPhysics['x'].currentThrust = -500
+            elif(dx > self.playerHoverDistance):
+                app.icPhysics['x'].currentThrust = 500
+            else:
+                app.icPhysics['x'].currentThrust = 0
+
+            self.intendedYPosition = app.playerObject.yPosition - self.yOffset - 150
+            dy = self.yPosition - self.intendedYPosition
+            hoverMargin = 100
+            if(dy > hoverMargin):
+                app.icPhysics['y'].currentThrust = dy 
+            elif(dy < -hoverMargin):
+                app.icPhysics['y'].currentThrust = dy * 2
+            else:
+                app.icPhysics['y'].currentThrust = 0
+
+        runPhysicsCalculations(app.icPhysics['x'])   
+        runPhysicsCalculations(app.icPhysics['y'])
+        # ptc("app.icPhysics['y'].currentVelocity",app.icPhysics['y'].currentVelocity)
+        self.xPosition -= app.icPhysics['x'].currentVelocity
+        self.yPosition -= app.icPhysics['y'].currentVelocity
+
+    def fireTooth(self,app):
+        # cobble this together into the boss being able to fire projectiles pleaseee
+        # if(app.spells[spellName].projectileType == 'linear'):
+        #     app.projectile[spellName] = Linear(spellName,frames,width,height,scale,drawBuffer,0,initialX,initialY,targetX,targetY,True)
+        # hitboxRotationAngle = app.shieldData[app.mouseScreenSector][2]
+        # width = int(app.spells[spellName].displayWidth * 0.2)
+        # height = int(app.spells[spellName].displayHeight * 0.9)
+        # [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(app.spells[spellName].xPosition, app.spells[spellName].yPosition, width, height, hitboxRotationAngle)
+        # app.hitbox[spellName] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4)
+        pass
+
+    def updateImage(self,app):
+        if(self.phase == 0):
+            self.imagePath = 'images/insidiousCreature/eyesClosed.png'
+        elif(self.phase == 1):
+            self.imagePath = 'images/insidiousCreature/eyesOpen.png'
+
+    def updateState(self,app):
+        if((self.health != self.maxHealth) and (app.currentBoss == None)):
+            app.currentBoss = 'insidiousCreature'
+            app.screenShakeMagnitude += 3
+            self.phase = 1
+            self.subphase = 'rise'
+            self.health = self.maxHealth
+            
 
 class TheHideousBeast(Enemy):
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit):
@@ -714,7 +782,7 @@ def updatePositioning(app):
     for enemyName in app.enemies:
         enemy = app.enemies[enemyName]
         enemy.xOffset -= (app.player['x'].currentVelocity)
-        enemy.yOffset = app.ti['ground'].yOffset
+        enemy.yOffset = int(app.ti['ground'].yOffset)
 
 def runPhysicsCalculations(subject):
     subject.currentAcceleration = (((subject.currentThrust)+(subject.gravity)+((subject.frictionConstant)*(subject.previousVelocity)))/((subject.mass)-(subject.frictionConstant)))
@@ -1775,16 +1843,71 @@ def initiateProjectile(app,projectileName):
         reportError('getting projectie data','UNRECOGNIZED PROJECTILE','getProjectileData','recieved unexpected projectile name',projectileName,None)
 
 # ENEMIES
+def initiateTheHideousBeast(app,Physics):
+    initialX = 100
+    initialY = app.ti['ground'].initialTileYPosition-80
+    app.enemies['theHideousBeast'] = TheHideousBeast('theHideousBeast',0,500,500,0.7,'center',100,0,initialX,initialY,500,10)
+
+    # initiating hitbox for the hideous beast
+    THBhitboxXAdjustmentConstant = app.enemies['theHideousBeast'].displayWidth//7
+    THBhitboxYAdjustmentConstant = app.enemies['theHideousBeast'].displayHeight//3
+    initiateHitbox(app,'theHideousBeast',app.enemies['theHideousBeast'],'enemy',THBhitboxXAdjustmentConstant,THBhitboxYAdjustmentConstant,'hitboxRect')
+
+    # creating physics dictionary for the hideous beast
+    app.THBPhysics = dict()
+
+    # intiating the hideous beast's physics axes
+    app.THBPhysics['x'] = Physics()
+    app.THBPhysics['y'] = Physics()
+
+    # tuning the hideous beast's physics parameters
+    app.THBPhysics['x'].mass = 150
+    app.THBPhysics['y'].mass = 150
+    app.THBPhysics['x'].setThrust = 700
+    app.THBPhysics['x'].setFrictionConstant = -20
+    app.THBPhysics['x'].frictionConstant = -20
+    app.THBPhysics['y'].setThrust = 700
+    app.THBPhysics['y'].setFrictionConstant = -20
+    app.THBPhysics['y'].frictionConstant = -20
+    app.setGravity = -150
+
+def initiateInsidiousCreature(app,Physics):
+    initialX = app.screenWidth * 1.5
+    initialY = app.ti['ground'].initialTileYPosition-80
+    app.enemies['insidiousCreature'] = InsidiousCreature('insidiousCreature',0,500,500,0.6,'center',100,0,initialX,initialY,500,5)
+
+    # establishing the hitbox radius for the Insidious Creature
+    app.enemies['insidiousCreature'].radius = int(app.enemies['insidiousCreature'].displayWidth * 0.4)
+
+    # initiating hitbox for the insidious creature)
+    initiateHitbox(app,'insidiousCreature',app.enemies['insidiousCreature'],'enemy',0,0,'hitboxCircle')
+
+    # insidious creature will be shortened to ic for clarity
+
+    # creating physics dictionary for the insidious creature
+    app.icPhysics = dict()
+
+    # intiating the insidious creature's physics axes
+    app.icPhysics['x'] = Physics()
+    app.icPhysics['y'] = Physics()
+
+    # tuning the insidious creature's physics parameters
+    app.icPhysics['x'].mass = 30
+    app.icPhysics['y'].mass = 30
+    app.icPhysics['x'].setThrust = 750
+    app.icPhysics['x'].setFrictionConstant = -20
+    app.icPhysics['x'].frictionConstant = -20
+    app.icPhysics['y'].setThrust = 750
+    app.icPhysics['y'].setFrictionConstant = -15
+    app.icPhysics['y'].frictionConstant = -15
+
 def updateEnemies(app):
     enemiesToDelete = set()
     for enemyName in app.enemies:
-        if(enemyName == 'theHideousBeast'):
-            app.currentBoss = 'theHideousBeast'
         enemy = app.enemies[enemyName]
         enemy.move(app)
         enemy.updateImage(app)
         enemy.updateState(app)
-
         if(enemy.deleteMe):
             if(enemyName == app.currentBoss):
                 app.currentBoss = None
@@ -2051,20 +2174,24 @@ def triggerCollisionEffect(app,hitbox_1,hitbox_2):
             # adverse effects
             return
         elif(otherHitbox.belongsTo == 'enemy'):
-            if(('theHideousBeast' in app.enemies) and (otherHitbox.associatedObject == app.enemies['theHideousBeast'])):
+            if(isinstance(otherHitbox.associatedObject, TheHideousBeast) or isinstance(otherHitbox.associatedObject, InsidiousCreature)):
                 if(app.playerImmunityFrames == 0):
-                    app.playerHealth -= app.enemies['theHideousBeast'].playerDamageOnHit
+                    app.playerHealth -= otherHitbox.associatedObject.playerDamageOnHit
                     app.playerImmunityFrames = 10
-    elif(('theHideousBeast' in app.enemies) and ((hitbox_1.associatedObject == app.enemies['theHideousBeast']) or (hitbox_2.associatedObject == app.enemies['theHideousBeast']))):
-        if(hitbox_1.associatedObject == app.enemies['theHideousBeast']):
-            THBhitbox = hitbox_1    
+
+    elif(isinstance(hitbox_1.associatedObject, Enemy) or isinstance(hitbox_2.associatedObject, Enemy)):
+        if(isinstance(hitbox_1.associatedObject, Enemy) and not isinstance(hitbox_2.associatedObject, Enemy)):
+            enemyHitbox = hitbox_1    
             otherHitbox = hitbox_2
-        else:
-            THBhitbox = hitbox_2
+        elif(isinstance(hitbox_2.associatedObject, Enemy) and not isinstance(hitbox_1.associatedObject, Enemy)):
+            enemyHitbox = hitbox_2
             otherHitbox = hitbox_1
-        if(('levelOneSlimeBall' in app.projectile ) and (otherHitbox.associatedObject == app.projectile['levelOneSlimeBall'])):
-            app.enemies['theHideousBeast'].health = max(app.enemies['theHideousBeast'].health - app.projectile['levelOneSlimeBall'].damage, 0)
-            app.projectile['levelOneSlimeBall'].deleteMe = True
+        else:
+            return
+        if(isinstance(otherHitbox.associatedObject, Projectile)):
+            print('contact!:',otherHitbox.associatedObject.name)
+            enemyHitbox.associatedObject.health = max(enemyHitbox.associatedObject.health - otherHitbox.associatedObject.damage, 0)
+            otherHitbox.associatedObject.deleteMe = True
 
 def checkCollisionType(hitbox_1, hitbox_2):
     result = set()
@@ -2091,8 +2218,13 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
     # check what kind of collision we have to run the calculations for
     collisionType = checkCollisionType(hitbox_1, hitbox_2)
     if(collisionType == {'hitboxCircle'}):
-        if(getDistance(hitbox_1.xPosition, hitbox_1.yPosition, hitbox_2.xPosition, hitbox_2.yPosition) <= (hitbox_1.radius + hitbox_2.radius)):
+        x_1 = hitbox_1.xPosition + hitbox_1.xOffset
+        y_1 = hitbox_1.yPosition + hitbox_1.yOffset
+        x_2 = hitbox_2.xPosition + hitbox_2.xOffset
+        y_2 = hitbox_2.yPosition + hitbox_2.yOffset
+        if(getDistance(x_1,y_1,x_2,y_2) <= (hitbox_1.radius + hitbox_2.radius)):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
+    
     elif(collisionType == {'hitboxRect'}):
         left_1 = hitbox_1.left + hitbox_1.xOffset
         right_1 = hitbox_1.right + hitbox_1.xOffset
@@ -2119,6 +2251,7 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
             # print('both rectangles')
             pass
+    
     elif(collisionType == {'hitboxAngledRect'}):
         hVertList_1 = []
         for i in hitbox_1.getVertList():
@@ -2127,8 +2260,9 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         for i in hitbox_2.getVertList():
             hVertList_2.append([(i[0] + hitbox_2.xOffset),(i[1] + hitbox_2.yOffset)])
         if(checkConvexPolygonIntersection(hVertList_1,hVertList_2) or checkConvexPolygonIntersection(hVertList_2,hVertList_1)):
-            print('contact')
+            triggerCollisionEffect(app, hitbox_1, hitbox_2)
             pass        
+    
     elif(collisionType == {'hitboxCircle', 'hitboxRect'}):
         if(isinstance(hitbox_1,HitboxCircle)):
             hitboxCircle = hitbox_1
@@ -2145,6 +2279,7 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         if((left <= x <= right) and (top <= y <= bottom)):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
             # print('one circle, one rectangle')
+    
     elif(collisionType == {'hitboxCircle', 'hitboxAngledRect'}):
         if(isinstance(hitbox_1,HitboxCircle)):
             hitboxCircle = hitbox_1
@@ -2156,8 +2291,13 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         for i in hitboxAngledRect.getVertList():
             hARVertList.append([(i[0] + hitboxAngledRect.xOffset),(i[1] + hitboxAngledRect.yOffset)])
         circleVert = [[(hitboxCircle.xPosition + hitboxCircle.xOffset),(hitboxCircle.yPosition + hitboxCircle.yOffset)]] 
-        if(checkConvexPolygonIntersection(circleVert,hARVertList)):
-            print('contact')
+        distanceCheck = False
+        for [hARx,hARy] in hARVertList:
+            if(getDistance(hARx,hARy,circleVert[0][0],circleVert[0][1]) <= hitboxCircle.associatedObject.radius):
+                distanceCheck = True
+        if(checkConvexPolygonIntersection(circleVert,hARVertList) or distanceCheck):
+            triggerCollisionEffect(app, hitbox_1, hitbox_2)
+    
     elif(collisionType == {'hitboxRect', 'hitboxAngledRect'}):
         if(isinstance(hitbox_1,HitboxRect)):
             hitboxRect = hitbox_1
@@ -2178,8 +2318,8 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         # print(hRVertList)
    
         if(checkConvexPolygonIntersection(hARVertList,hRVertList) or checkConvexPolygonIntersection(hRVertList,hARVertList)):
-            print('contact')
-            pass
+            triggerCollisionEffect(app, hitbox_1, hitbox_2)
+    
     else:
         reportError('attempting to run collision calculations','UNRECOGNIZED COLLISION TYPE','runCollisionCalculations','recieved collision type',collisionType,None)
 
@@ -2907,7 +3047,7 @@ def gameSetup(app):
     app.spells['levelOneSlimeBall'] = Spell('aggressive','grtf','levelOneSlimeBall','mapProjectile',1,250,250,0.1,10,10)
     app.spells['levelOneSlimeBall'].projectileType = 'groundbounce'
     app.spells['shield'] = Spell('defensive','zr','shield','shield',1,250,250,0.25,5,0)
-    app.spells['ghostSword'] = Spell('aggressive','1','ghostSword','mapProjectile',1,250,250,0.5,0,10) # final combo will be 1g43t
+    app.spells['ghostSword'] = Spell('aggressive','1g43t','ghostSword','mapProjectile',1,250,250,0.5,0,10)
     app.spells['ghostSword'].projectileType = 'linear'
     # establishing signifier that tells which side of the screen the mouse is on
     app.mouseOrbSide = 'right'
@@ -3017,6 +3157,7 @@ def gameSetup(app):
     app.gui['bossBar'] = GuiElement('images/GUI/bossBar.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
     app.gui['bossBarBackground'] = GuiElement('images/GUI/bossBarBackground.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
     app.gui['theHideousBeastTitle'] = GuiElement('images/GUI/theHideousBeastTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
+    app.gui['insidiousCreatureTitle'] = GuiElement('images/GUI/insidiousCreatureTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
     app.spellScrollBottomYPosition = (app.screenHeight-5)
     app.spellScrollTopYPosition = int(app.screenHeight*0.0625) 
     app.gui['spellScroll'] = GuiElement('images/GUI/spellScroll.png',app.screenWidth,app.spellScrollBottomYPosition,500,1000,0.75,100,'top-right')
@@ -3121,32 +3262,10 @@ def gameSetup(app):
     app.enemies = dict()
     
     # initializing test boss, The Hideous Beast
-    initialX = 100
-    initialY = app.ti['ground'].initialTileYPosition-80
-    app.enemies['theHideousBeast'] = TheHideousBeast('theHideousBeast',0,500,500,0.7,'center',100,0,initialX,initialY,500,10)
+    # initiateTheHideousBeast(app,Physics)
 
-    # initiating hitbox for the hideous beast
-    THBhitboxXAdjustmentConstant = app.enemies['theHideousBeast'].displayWidth//7
-    THBhitboxYAdjustmentConstant = app.enemies['theHideousBeast'].displayHeight//3
-    initiateHitbox(app,'theHideousBeast',app.enemies['theHideousBeast'],'enemy',THBhitboxXAdjustmentConstant,THBhitboxYAdjustmentConstant,'hitboxRect')
-
-    # creating physics dictionary for the hideous beast
-    app.THBPhysics = dict()
-
-    # intiating the hideous beast's physics axes
-    app.THBPhysics['x'] = Physics()
-    app.THBPhysics['y'] = Physics()
-
-    # tuning the hideous beast's physics parameters
-    app.THBPhysics['x'].mass = 150
-    app.THBPhysics['y'].mass = 150
-    app.THBPhysics['x'].setThrust = 700
-    app.THBPhysics['x'].setFrictionConstant = -20
-    app.THBPhysics['x'].frictionConstant = -20
-    app.THBPhysics['y'].setThrust = 700
-    app.THBPhysics['y'].setFrictionConstant = -20
-    app.THBPhysics['y'].frictionConstant = -20
-    app.setGravity = -150
+    # initializing the final boss, Insidious Creature
+    initiateInsidiousCreature(app,Physics)
 
     # ---- GAME STATE SETUP ----
     # initializing game state

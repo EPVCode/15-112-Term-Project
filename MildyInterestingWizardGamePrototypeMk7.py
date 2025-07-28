@@ -4,6 +4,8 @@
 
 # TODO:
 # MAKE ENEMIES CAPABLE OF FIRING PROJECTILES
+# FINISH SHIELD FUNCTIONALITY - blocks enemy projectiles
+# ADD COOL LIGHTING SPELL
 # START WORKING ON FINAL BOSS
 # ADD HEALTH REGAIN AND MANA REGAIN ITEMS
 # VIDEO IS VERY IMPORTANT!!! WORK ON VIDEO!!!! WRITE DOWN KEY FEATURES OF CODE I WANT TO POINT OUT IN VIDEO
@@ -81,6 +83,7 @@ class Projectile:
         self.xOffset = 0
         self.yOffset = 0
         self.damage = 0
+        self.drawFirst = False
         # adding all hitbox parameters evey though all of them will not be used
         # is there another way around this?
         self.radius = 0
@@ -138,8 +141,8 @@ class Linear(Projectile):
             else:
                 self.directionalVelocity = 0
 
-        self.xVelocity += math.cos(self.directionAngle) * self.directionalVelocity
-        self.yVelocity += math.sin(self.directionAngle) * self.directionalVelocity
+        self.xVelocity = math.cos(self.directionAngle) * self.directionalVelocity
+        self.yVelocity = math.sin(self.directionAngle) * self.directionalVelocity
 
         self.xPosition += self.xVelocity
         self.yPosition += self.yVelocity
@@ -294,6 +297,7 @@ class Enemy:
         self.yOffset = 0
         self.facing = 'right'
         self.deleteMe = False
+        self.invulnerable = False
 
 class InsidiousCreature(Enemy):
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit):
@@ -303,9 +307,16 @@ class InsidiousCreature(Enemy):
         self.radius = 0
         self.phase = 0
         self.subphase = 0
-        self.subphaseCounter = 0
+        self.subphaseCounter = 0 
         self.playerHoverDistance = 500
         self.intendedYPosition = 0
+        self.activeTeeth = set()
+        self.maxTeeth = 5
+        self.healthCheckpoint = 0
+        self.teethCheckSet = set([f'tooth_{i}' for i in range(self.maxTeeth)])
+        # print('teethcheckset:',self.teethCheckSet)
+        self.attackCounter = 1
+        self.attackSpeed = 20
     
     def move(self,app):
         if(self.subphase == 'rise'):
@@ -316,6 +327,7 @@ class InsidiousCreature(Enemy):
                 if(app.icPhysics['y'].currentThrust < 1):
                     app.icPhysics['y'].currentThrust = 0
             else:
+                self.invulnerable = False
                 self.subphase = 'chase'
         elif(self.subphase == 'chase'):
             dx = (self.xPosition + self.xOffset) - app.playerObject.xPosition
@@ -342,16 +354,65 @@ class InsidiousCreature(Enemy):
         self.xPosition -= app.icPhysics['x'].currentVelocity
         self.yPosition -= app.icPhysics['y'].currentVelocity
 
+    def attackCoordinator(self,app):
+        if((self.phase == 1) and (self.subphase == 'chase')):
+            if(app.boundingBox == None):
+                app.boundingBox = BoundingBox(self.xPosition, self.yPosition, self.xOffset, self.yOffset, 2500, 1750,3)
+            else:
+                app.boundingBox.align(self.xPosition, self.yPosition, self.xOffset, self.yOffset)
+            if((self.attackCounter % self.attackSpeed) == 0):
+                self.fireTooth(app)
+                self.attackCounter = 0
+            self.attackCounter += 1
+            if(self.health <= self.healthCheckpoint):
+                self.attackSpeed -= 3
+                self.healthCheckpoint -= 45
+                print('changed attack speed, now', self.attackSpeed)
+                print('new health checkpoint:',self.healthCheckpoint)
+
     def fireTooth(self,app):
-        # cobble this together into the boss being able to fire projectiles pleaseee
-        # if(app.spells[spellName].projectileType == 'linear'):
-        #     app.projectile[spellName] = Linear(spellName,frames,width,height,scale,drawBuffer,0,initialX,initialY,targetX,targetY,True)
-        # hitboxRotationAngle = app.shieldData[app.mouseScreenSector][2]
-        # width = int(app.spells[spellName].displayWidth * 0.2)
-        # height = int(app.spells[spellName].displayHeight * 0.9)
-        # [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(app.spells[spellName].xPosition, app.spells[spellName].yPosition, width, height, hitboxRotationAngle)
-        # app.hitbox[spellName] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4)
-        pass
+        # print('firing!')
+        currentTooth = None
+        for tooth in self.teethCheckSet:
+            if(tooth not in self.activeTeeth):
+                currentTooth = tooth
+                break
+        if(currentTooth == None):
+            return
+        # print('current tooth:',currentTooth)
+        # setting up initial position and target position
+        initialX = self.xPosition + self.xOffset
+        initialY = self.yPosition + self.yOffset
+        targetX = app.playerObject.centerX
+        targetY = app.playerObject.centerY
+        # factoring in overshoot, to make the projectile follow through more
+        overshoot = 100
+        aimOffset = 15 # in degrees
+        dx = targetX - initialX
+        dy = targetY - initialY
+        distance = getDistance(targetX, targetY, initialX, initialY)
+        if(distance == 0):
+            distance = 0.001
+        if(dx > 0):
+            rotationAngle = math.radians(180) + (math.asin((dy)/distance))
+        else:
+            rotationAngle = (math.asin((-dy)/distance))
+        rotationAngle += math.radians(random.randint(-aimOffset, aimOffset))
+        targetX -= math.cos(rotationAngle) * overshoot
+        targetY -= math.sin(rotationAngle) * overshoot
+        
+        # ptc('initialX',initialX)
+        # ptc('initialY',initialY)
+        # ptc('targetX',targetX)
+        # ptc('targetY',targetY)
+
+        app.projectile[currentTooth] = Linear(currentTooth,0,250,250,0.5,10,0,initialX,initialY,targetX,targetY,False)
+        app.projectile[currentTooth].imagePath = 'images/insidiousCreature/tooth.png'
+        app.projectile[currentTooth].drawFirst = True
+        # print('added projectile:',currentTooth,'to active map projectiles')
+        app.activeMapProjectiles.append(currentTooth)
+        initiateProjectile(app,currentTooth)
+        self.activeTeeth.add(currentTooth)
 
     def updateImage(self,app):
         if(self.phase == 0):
@@ -366,7 +427,21 @@ class InsidiousCreature(Enemy):
             self.phase = 1
             self.subphase = 'rise'
             self.health = self.maxHealth
-            
+            self.healthCheckpoint = self.maxHealth - 45
+            self.invulnerable = True
+        if(self.health == 0):
+            print('died')
+            app.playerHealth == 100
+            self.deleteMe = True
+        self.attackCoordinator(app)
+        if(self.phase != 0):
+            self.subphaseCounter += 1
+
+    def __hash__(self):
+        return hash(str(self))
+    
+    def __eq__(self,other):
+        return ((isinstance(other,InsidiousCreature)) and (self.name == other.name))
 
 class TheHideousBeast(Enemy):
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit):
@@ -420,6 +495,52 @@ class TheHideousBeast(Enemy):
             print('died')
             app.playerHealth == 100
             self.deleteMe = True
+
+# ---- BOUNDING BOX ---- 
+class BoundingBox:
+    def __init__(self,xPosition,yPosition,xOffset,yOffset,width,height,outOfBoundsDamage):
+        self.xPosition = xPosition
+        self.yPosition = yPosition
+        self.initialXPosition = xPosition
+        self.initialYPosition = yPosition
+        self.xOffset = xOffset
+        self.yOffset = yOffset
+        self.width = width
+        self.height = height
+        self.outOfBoundsDamage = outOfBoundsDamage
+        self.verticalImagePath = 'images/boundingBox/vertical.png'
+        self.horizontalImagePath = 'images/boundingBox/horizontal.png'
+        self.borderWidth = 50
+        self.borderHeight = 50
+        self.getBorderPositions()
+
+    def getBorderPositions(self):
+        self.left = self.xPosition - int(self.width // 2)
+        self.right = self.xPosition + int(self.width // 2)
+        self.top = self.yPosition - int(self.height // 2)
+        self.bottom = self.yPosition + int(self.height // 2)
+
+    def align(self,otherX,otherY,otherXOffset,otherYOffset):
+        self.xPosition = otherX
+        self.yPosition = otherY
+        self.xOffset = otherXOffset
+        self.yOffset = otherYOffset
+        self.getBorderPositions()
+
+    def checkPlayerLocation(self,app):
+        if((-(self.xPosition + self.xOffset) > ((self.width // 3.5))) or (-(self.xPosition + self.xOffset) < -((self.width * 0.7)))):
+            print(self.xPosition + self.xOffset)
+            # print('out of bounds!')
+            if(app.playerImmunityFrames == 0):
+                app.playerHealth = max((app.playerHealth - self.outOfBoundsDamage), 0)
+                app.screenShakeMagnitude += 5
+                app.playerImmunityFrames += self.outOfBoundsDamage*5
+
+    def draw(self):
+        drawImage(self.verticalImagePath, self.left + self.xOffset, self.yPosition + self.yOffset, width = self.borderWidth, height = self.height, align = 'center')
+        drawImage(self.verticalImagePath, self.right + self.xOffset, self.yPosition + self.yOffset, width = self.borderWidth, height = self.height, align = 'center')
+        drawImage(self.horizontalImagePath, self.xPosition + self.xOffset, self.top + self.yOffset, width = self.width, height = self.borderHeight, align = 'center')
+        drawImage(self.horizontalImagePath, self.xPosition + self.xOffset, self.bottom + self.yOffset, width = self.width, height = self.borderHeight, align = 'center')
 
 # ---- SIMPLE ANIMATION ----
 class SimpleAnimation:
@@ -1403,8 +1524,8 @@ def lightmapSetup(app):
     app.lightmapOpacityMatrix = numpy.array([[[0,255]] * app.lightmapMatrixX]*app.lightmapMatrixY, dtype=numpy.uint8)
     app.lightmapXPosition = -(app.lightmapBuffer/5)
     app.lightmapYPosition = -(app.lightmapBuffer/5)
-    print(f'{len(app.lightmapOpacityMatrix)} rows')
-    print(f'{len(app.lightmapOpacityMatrix[0])} columns')
+    # print(f'{len(app.lightmapOpacityMatrix)} rows')
+    # print(f'{len(app.lightmapOpacityMatrix[0])} columns')
 
 # helper function to calculate gaussian lightmap map
 def calculateLightmapGaussian(x,y,lightSources,opacityOffset):
@@ -1469,7 +1590,7 @@ def updateLightsources(app):
     while i < len(app.lightSources):
         if(app.lightSources[i].intensity == 0):
             app.lightSources.pop(i)
-            print('# of active light soures: ',len(app.lightSources))
+            # print('# of active light soures: ',len(app.lightSources))
         else:
             app.lightSources[i].intensity = int(math.floor((app.lightSources[i].intensity * app.lightSources[i].fadeRate)*100)/100)
             i+=1
@@ -1549,7 +1670,7 @@ def chargeSpell(app,spellName):
     # is there an active spell of this type already?
     # if so, tell that to the gui spell combo display and don't charge spell
     if(len(app.spellData[spellType].activeSpell) != 0):
-        print('overcharged!')
+        # print('overcharged!')
         app.comboShake += 15
         app.comboCounter = 20
         app.displayCombo = 'overcharged!'
@@ -1558,7 +1679,7 @@ def chargeSpell(app,spellName):
     # does the player not have enough mana to cast the spell?
     # if so, tell that to the gui spell combo display and don't charge spell
     if((app.playerMana - app.spells[spellName].manaCost) < 0):
-        print('not enough mana!')
+        # print('not enough mana!')
         app.comboShake += 10    
         app.comboCounter = 20
         app.displayCombo = 'insufficient mana!'
@@ -1637,14 +1758,14 @@ def initiateSpellCast(app,spellName,targetX,targetY):
 
         # register each projectile as either a map or player projectile
         if(app.spells[spellName].displayType == 'mapProjectile'):
-            print('added projectile:',spellName,'to active map projectiles')
+            # print('added projectile:',spellName,'to active map projectiles')
             app.activeMapProjectiles.append(spellName)
         elif(app.spells[spellName].displayType == 'playerProjectile'):
             app.activePlayerProjectiles.append(spellName)
-            print('added projectile:',spellName,'to active player projectiles')
+            # print('added projectile:',spellName,'to active player projectiles')
 
         # create projectile instances using spell data
-        print('projectile Type:',app.spells[spellName].projectileType)
+        # print('projectile Type:',app.spells[spellName].projectileType)
         if(app.spells[spellName].projectileType == 'linear'):
             app.projectile[spellName] = Linear(spellName,frames,width,height,scale,drawBuffer,0,initialX,initialY,targetX,targetY,True)
         elif(app.spells[spellName].projectileType == "pointHoming"):
@@ -1756,8 +1877,6 @@ def drawSpell(app,spellName):
 def activateSpellEffect(app,spellName):
     if(spellName == 'testLightSpell'):
         app.lightSources.append(LightSource(3,255,(app.spells[spellName].targetX/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),0.95))
-    elif(spellName == 'testBall'):
-        print('YIPPEE!!')
     elif(spellName == 'levelOneSlimeBall'):
         frameList = ['images/spells/levelOneSlimeBallEndAnimation_0.png','images/spells/levelOneSlimeBallEndAnimation_1.png','images/spells/levelOneSlimeBallEndAnimation_2.png']
         displayWidth = app.spells[spellName].displayWidth
@@ -1782,19 +1901,33 @@ def drawProjectile(app,projectileName):
 def updateProjectiles(app):
     # update active map projectiles
     for projectileName in app.activeMapProjectiles:
+        # print('current projectile handling:', projectileName)
+        if(not app.projectile[projectileName].isPlayerSpell):
+            endCondition = app.projectile[projectileName].move()
+            if(endCondition):
+                app.projectile[projectileName].deleteMe = True
+
         if(app.projectile[projectileName].deleteMe):
             if(app.projectile[projectileName].isPlayerSpell):
                 app.spells[projectileName].xPosition = app.projectile[projectileName].xPosition + app.projectile[projectileName].xOffset
                 app.spells[projectileName].yPosition = app.projectile[projectileName].yPosition
                 app.spells[projectileName].displayAngle = app.projectile[projectileName].displayAngle
                 activateSpellEffect(app,projectileName)
+            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].teethCheckSet)):
+                app.enemies['insidiousCreature'].activeTeeth.remove(projectileName)
             app.activeMapProjectiles.remove(projectileName)
             del app.projectile[projectileName]
-            print('removed map projectile:',projectileName)
+            # print('removed map projectile:',projectileName)
             del app.hitbox[projectileName]
-            print('also removed hitbox', projectileName)
+            # print('also removed hitbox', projectileName)
+
     # update active player projectiles
     for projectileName in app.activePlayerProjectiles:
+        if(not app.projectile[projectileName].isPlayerSpell):
+            endCondition = app.projectile[projectileName].move()
+            if(endCondition):
+                app.projectile[projectileName].deleteMe = True
+            
         if(app.projectile[projectileName].deleteMe):
             if(app.projectile[projectileName].isPlayerSpell):
                 app.spells[projectileName].xPosition = app.projectile[projectileName].xPosition
@@ -1803,20 +1936,30 @@ def updateProjectiles(app):
                 activateSpellEffect(app,projectileName)
             app.activePlayerProjectiles.remove(projectileName)
             del app.projectile[projectileName]
-            print('removed player projectile:', projectileName)
+            # print('removed player projectile:', projectileName)
             del app.hitbox[projectileName]
-            print('also removed hitbox', projectileName)
+            # print('also removed hitbox', projectileName)
 
 def initiateProjectile(app,projectileName):
     if(projectileName == 'ghostSword'):
         p = app.projectile[projectileName]
-        p.directionalAcceleration = 5
-        p.maxVelocity = 10
+        p.directionalAcceleration = 10
+        p.maxVelocity = 100
         p.damage = 25
         p.initialYOffset = app.ti['ground'].yOffset
         xAdjustment = int(p.displayWidth * 0.1)
         yAdjustment = int(p.displayWidth * 0.9)
         initiateHitbox(app,projectileName,p,'player',xAdjustment,yAdjustment,'hitboxAngledRect')
+    elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].teethCheckSet)):
+        p = app.projectile[projectileName]
+        p.directionalAcceleration = 5
+        p.maxVelocity = 100
+        p.damage = 10
+        p.initialYOffset = app.ti['ground'].yOffset
+        xAdjustment = int(p.displayWidth * 0)
+        yAdjustment = int(p.displayWidth * 0.75)
+        # print('added new tooth!',projectileName)
+        initiateHitbox(app,projectileName,p,'enemy',xAdjustment,yAdjustment,'hitboxAngledRect')
     elif(projectileName == 'levelOneSlimeBall'):
         p = app.projectile[projectileName]
         p.directionalVelocity = 10
@@ -1840,7 +1983,7 @@ def initiateProjectile(app,projectileName):
         p.damping = 10
         initiateHitbox(app,projectileName,p,'player',0,0,'hitboxCircle')
     else:
-        reportError('getting projectie data','UNRECOGNIZED PROJECTILE','getProjectileData','recieved unexpected projectile name',projectileName,None)
+        reportError('getting projectie data','UNRECOGNIZED PROJECTILE','initiateProjectile','recieved unexpected projectile name',projectileName,None)
 
 # ENEMIES
 def initiateTheHideousBeast(app,Physics):
@@ -1874,7 +2017,7 @@ def initiateTheHideousBeast(app,Physics):
 def initiateInsidiousCreature(app,Physics):
     initialX = app.screenWidth * 1.5
     initialY = app.ti['ground'].initialTileYPosition-80
-    app.enemies['insidiousCreature'] = InsidiousCreature('insidiousCreature',0,500,500,0.6,'center',100,0,initialX,initialY,500,5)
+    app.enemies['insidiousCreature'] = InsidiousCreature('insidiousCreature',0,500,500,0.6,'center',100,0,initialX,initialY,1000,20)
 
     # establishing the hitbox radius for the Insidious Creature
     app.enemies['insidiousCreature'].radius = int(app.enemies['insidiousCreature'].displayWidth * 0.4)
@@ -2077,7 +2220,7 @@ def updateScreenShake(app):
 # HITBOX & HITBOX MANAGEMENT
 def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,hitboxType):
     if(hitboxType == 'hitboxCircle'):
-        print('initiated circle')
+        # print('initiated circle')
         x = associatedObject.xPosition
         y = associatedObject.yPosition
         radius = associatedObject.radius
@@ -2098,7 +2241,7 @@ def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,h
         h.associatedObject = associatedObject
         h.belongsTo = belongsTo
     elif(hitboxType == 'hitboxAngledRect'):
-        print('initiated AngledRect')
+        # print('initiated AngledRect')
         centerX = associatedObject.xPosition
         centerY = associatedObject.yPosition - associatedObject.initialYOffset
         targetX = associatedObject.targetX
@@ -2176,8 +2319,13 @@ def triggerCollisionEffect(app,hitbox_1,hitbox_2):
         elif(otherHitbox.belongsTo == 'enemy'):
             if(isinstance(otherHitbox.associatedObject, TheHideousBeast) or isinstance(otherHitbox.associatedObject, InsidiousCreature)):
                 if(app.playerImmunityFrames == 0):
-                    app.playerHealth -= otherHitbox.associatedObject.playerDamageOnHit
-                    app.playerImmunityFrames = 10
+                    app.playerHealth =  max((app.playerHealth - otherHitbox.associatedObject.playerDamageOnHit), 0)
+                    app.playerImmunityFrames = otherHitbox.associatedObject.playerDamageOnHit
+                    app.screenShakeMagnitude += 4
+            if(isinstance(otherHitbox.associatedObject, Projectile) and (otherHitbox.belongsTo == 'enemy')):
+                app.playerHealth = max((app.playerHealth - otherHitbox.associatedObject.damage), 0)
+                otherHitbox.associatedObject.deleteMe = True
+                app.screenShakeMagnitude += 2
 
     elif(isinstance(hitbox_1.associatedObject, Enemy) or isinstance(hitbox_2.associatedObject, Enemy)):
         if(isinstance(hitbox_1.associatedObject, Enemy) and not isinstance(hitbox_2.associatedObject, Enemy)):
@@ -2189,9 +2337,10 @@ def triggerCollisionEffect(app,hitbox_1,hitbox_2):
         else:
             return
         if(isinstance(otherHitbox.associatedObject, Projectile)):
-            print('contact!:',otherHitbox.associatedObject.name)
-            enemyHitbox.associatedObject.health = max(enemyHitbox.associatedObject.health - otherHitbox.associatedObject.damage, 0)
-            otherHitbox.associatedObject.deleteMe = True
+            if((otherHitbox.belongsTo == 'player') and (not enemyHitbox.associatedObject.invulnerable)):
+                # print('contact!:',otherHitbox.associatedObject.name)
+                enemyHitbox.associatedObject.health = max(enemyHitbox.associatedObject.health - otherHitbox.associatedObject.damage, 0)
+                otherHitbox.associatedObject.deleteMe = True
 
 def checkCollisionType(hitbox_1, hitbox_2):
     result = set()
@@ -2368,8 +2517,8 @@ def setupCombos(app):
         app.fullLetterSet.add(letter)
     app.fullComboSet.add(app.cancelCombo)
 
-    ptc('app.fullComboSet',app.fullComboSet)
-    ptc('app.fullLetterSet',app.fullLetterSet)
+    # ptc('app.fullComboSet',app.fullComboSet)
+    # ptc('app.fullLetterSet',app.fullLetterSet)
 
 # helper function to detect if our combo in progress is part of any 
 # full combo that we actually have
@@ -2385,7 +2534,7 @@ def matchesCombo(app):
             combosIn += 1
             # print(f'comboInProgrgress {app.comboInProgress} is in full combo {possibleCombo}!')
             if(app.comboInProgress == possibleCombo):
-                print('combo complete!',app.comboInProgress,'is',possibleCombo)
+                # print('combo complete!',app.comboInProgress,'is',possibleCombo)
                 # for spellType in app.spellTypes:
                 #     print(spellType)
                 #     print('drawing:',app.spellData[spellType].drawingSpell)
@@ -2417,7 +2566,7 @@ def detectCombos(app,currentKey):
                 app.comboInProgress = ''
             for spell in app.spells:
                 if(comboMatched == app.spells[spell].combo):
-                    print(f'charging spell {app.spells[spell].name} with corresponding combo {comboMatched}. ({comboMatched} = {app.spells[spell].combo})')
+                    # print(f'charging spell {app.spells[spell].name} with corresponding combo {comboMatched}. ({comboMatched} = {app.spells[spell].combo})')
                     chargeSpell(app,app.spells[spell].name)
                     app.comboInProgress = ''
 
@@ -2426,8 +2575,6 @@ def onKeyPress(app,key):
 
     if(app.gameState == 'main'):
         # TEMPORARY DEBUG KEY PRESSES
-        if(key == 'i'):
-            app.enemies['theHideousBeast'].health = max((app.enemies['theHideousBeast'].health-10),0)
         if(key == 'o'):
             print('die.')
             app.playerHealth = 0
@@ -2562,7 +2709,6 @@ def onMousePress(app,mouseX,mouseY,button):
             # print('iniating defensive spell cast')
             app.playerManaRechargeCounter = 0
             getMouseScreenSector(app,mouseX,mouseY)
-            print('bluh')
             initiateSpellCast(app,app.spellData['defensive'].activeSpell[0].name,mouseX,mouseY)
             
             # if button 2 is pressed and the shield spell has already been cast
@@ -2626,6 +2772,8 @@ def onStep(app):
         updateSpellOrb(app)
         updateProjectiles(app)
         updateEnemies(app)
+        if(app.boundingBox != None):
+            app.boundingBox.checkPlayerLocation(app)
         for hitboxName in app.hitbox:
             updateHitbox(app,app.hitbox[hitboxName])
         checkCollisions(app)
@@ -2643,7 +2791,6 @@ def redrawAll(app):
         drawPlayer(app)
         drawSpellOrb(app)
         drawEnemies(app)
-        drawLightmap(app)
     if(app.gameState == 'main'):
         for spellType in app.spellTypes:
             for spell in app.spellData[spellType].activeSpell:
@@ -2662,6 +2809,8 @@ def redrawAll(app):
                 displayHitbox(app,app.hitbox[hitboxName])
         for i in app.simpleAnimations:
             i.draw(app)
+    if(app.gameState in {'main','paused','dead'}):
+        drawLightmap(app)
         # temporary readout for variables
         if(app.transparencyTest):
             transparencyTest(app)
@@ -2708,6 +2857,8 @@ def redrawAll(app):
                                     app.playerWingCounter,
                                     'current player state',
                                     app.playerState])    
+    if((app.gameState == 'main') and (app.boundingBox != None)):
+        app.boundingBox.draw()
     drawGui(app) 
 
 # GAME SETUP
@@ -2939,7 +3090,7 @@ def gameSetup(app):
     # # adding an arbitrary very large value to the end
     # app.playerGroundYOffsets.append(3000)
 
-    print(app.playerGroundYOffsets)
+    # print(app.playerGroundYOffsets)
 
     # setting up current player ground Y coordinate indicator
     app.currentPlayerGroundYOffset = 0
@@ -3155,9 +3306,9 @@ def gameSetup(app):
     app.gui['menuPlayButton'] = GuiElement('images/GUI/menuPlayButtonOff.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.25,100,'center')
     app.gui['deathText'] = GuiElement('images/GUI/deathText.png',(app.screenWidth//2),(app.screenHeight//2),500,500,1,100,'center')
     app.gui['bossBar'] = GuiElement('images/GUI/bossBar.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
-    app.gui['bossBarBackground'] = GuiElement('images/GUI/bossBarBackground.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
-    app.gui['theHideousBeastTitle'] = GuiElement('images/GUI/theHideousBeastTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
-    app.gui['insidiousCreatureTitle'] = GuiElement('images/GUI/insidiousCreatureTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
+    app.gui['bossBarBackground'] = GuiElement('images/GUI/bossBarBackground.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,100,'center')
+    app.gui['theHideousBeastTitle'] = GuiElement('images/GUI/theHideousBeastTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,100,'center')
+    app.gui['insidiousCreatureTitle'] = GuiElement('images/GUI/insidiousCreatureTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,100,'center')
     app.spellScrollBottomYPosition = (app.screenHeight-5)
     app.spellScrollTopYPosition = int(app.screenHeight*0.0625) 
     app.gui['spellScroll'] = GuiElement('images/GUI/spellScroll.png',app.screenWidth,app.spellScrollBottomYPosition,500,1000,0.75,100,'top-right')
@@ -3238,9 +3389,11 @@ def gameSetup(app):
     app.sectorAngles['ssUpLeft'] = [app.sectorAngles['ssUp'][1],(360 + 180 - app.sectorAngles['ssUpRight'][0])]
     app.sectorAngles['ssLeft'] = [(360 + 180 - app.sectorAngles['ssRight'][1]),(180 - app.sectorAngles['ssRight'][0])]
     app.sectorAngles['ssDown'] = [(180 - app.sectorAngles['ssRight'][0]),app.sectorAngles['ssRight'][0]]
-    for sector in app.sectorAngles:
-        ptc('sector',sector)
-        ptc('angles',app.sectorAngles[sector])
+    
+    # indicate angles
+    # for sector in app.sectorAngles:
+        # ptc('sector',sector)
+        # ptc('angles',app.sectorAngles[sector])
     
     # setting up screen sector indicator
     app.mouseScreenSector = 'ssRight'
@@ -3266,6 +3419,11 @@ def gameSetup(app):
 
     # initializing the final boss, Insidious Creature
     initiateInsidiousCreature(app,Physics)
+    
+    
+    # ---- BOUNDING BOX SETUP ---
+    # establishing bounding box existence variable
+    app.boundingBox = None
 
     # ---- GAME STATE SETUP ----
     # initializing game state
@@ -3333,4 +3491,4 @@ def main():
 
 main()
 
-# total hours spent working here: ~92
+# total hours spent working here: ~95

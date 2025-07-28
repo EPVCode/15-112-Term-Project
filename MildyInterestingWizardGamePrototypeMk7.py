@@ -317,6 +317,7 @@ class InsidiousCreature(Enemy):
         # print('teethcheckset:',self.teethCheckSet)
         self.attackCounter = 1
         self.attackSpeed = 20
+        self.phaseCheckpoint = 750
     
     def move(self,app):
         if(self.subphase == 'rise'):
@@ -365,10 +366,15 @@ class InsidiousCreature(Enemy):
                 self.attackCounter = 0
             self.attackCounter += 1
             if(self.health <= self.healthCheckpoint):
-                self.attackSpeed -= 3
+                self.attackSpeed -= 2
                 self.healthCheckpoint -= 45
                 print('changed attack speed, now', self.attackSpeed)
                 print('new health checkpoint:',self.healthCheckpoint)
+            if(self.health <= self.phaseCheckpoint):
+                self.phase += 1
+                self.phaseCheckpoint = 250
+                print('new Phase!', self.phase)
+                print('new phase checkpoint:', self.phaseCheckpoint)
 
     def fireTooth(self,app):
         # print('firing!')
@@ -529,7 +535,7 @@ class BoundingBox:
 
     def checkPlayerLocation(self,app):
         if((-(self.xPosition + self.xOffset) > ((self.width // 3.5))) or (-(self.xPosition + self.xOffset) < -((self.width * 0.7)))):
-            print(self.xPosition + self.xOffset)
+            # print(self.xPosition + self.xOffset)
             # print('out of bounds!')
             if(app.playerImmunityFrames == 0):
                 app.playerHealth = max((app.playerHealth - self.outOfBoundsDamage), 0)
@@ -1954,7 +1960,7 @@ def initiateProjectile(app,projectileName):
         p = app.projectile[projectileName]
         p.directionalAcceleration = 5
         p.maxVelocity = 100
-        p.damage = 10
+        p.damage = 7
         p.initialYOffset = app.ti['ground'].yOffset
         xAdjustment = int(p.displayWidth * 0)
         yAdjustment = int(p.displayWidth * 0.75)
@@ -3491,4 +3497,4 @@ def main():
 
 main()
 
-# total hours spent working here: ~95
+# total hours spent working here: ~99

@@ -4,13 +4,15 @@
 
 # TODO:
 # ADD COOL LIGHTNING SPELL
-# FINISH WORKING ON FINAL BOSS PHASE 2
-# FINISH ADDING HEALTH REGAIN AND MANA REGAIN ITEMS
+# FINAL BOSS ANIMATION & WIN CONDITION
 # VIDEO IS VERY IMPORTANT!!! WORK ON VIDEO!!!! WRITE DOWN KEY FEATURES OF CODE I WANT TO POINT OUT IN VIDEO
-# ADD PLAYER HURT - show that player has been hurt somehow, play sound probably
 # name wizard - Wizard Bossfight, firstname Wizard, lastname Bossfight
+# BUG TO MAYBE FIX: pausing screws with key presses
+# ADD FEATURE TO DISABLE TESTING FEATURES
+# FIGURE OUT BUG WITH FINAL ATTACK - WHY THE HECK DOES HITBOX SPAWN IN WRONG PLACE?
 
 # QUESTIONS FOR PROF TAYLOR:
+# HOW DO I DIRECTLY DELETE INSTANCES OF A CLASS
 
 # IMPORTS
 from cmu_graphics import *
@@ -33,12 +35,12 @@ import copy
 # ---- LIGHTING ----
 # intilaizing light soure class
 class LightSource:
-    def __init__(self,spread,intensity,x,y,initialY,fadeRate):
+    def __init__(self,spread,intensity,x,y,fadeRate):
         self.spread = spread
         self.intensity = intensity
         self.x = x
         self.y = y
-        self.initialY = initialY
+        self.initialY = y
         self.counter = 0
         self.fadeRate = fadeRate
     def fade(self):
@@ -113,7 +115,7 @@ class Projectile:
         self.xOffset = 0
         self.yOffset = 0
         self.damage = 0
-        self.drawFirst = False
+        self.ignoreScreenBounds = False
         # adding all hitbox parameters evey though all of them will not be used
         # is there another way around this?
         self.radius = 0
@@ -301,6 +303,54 @@ class Groundbounce(Projectile):
         self.timer += 1
 
         return ((self.timer >= self.lifespan) or (self.bounces >= self.maxBounces))
+    
+# setting up class for the lazer beam attack in particular
+class InsidiousCreatureLazer:
+    def __init__(self,app,name,xOffset,yOffset):
+        # print('fired lazer')
+        self.fireAngleDeg = random.randint(0,360)
+        self.fireAngleRad = math.radians(self.fireAngleDeg)
+        self.xOffset = xOffset
+        self.yOffset = yOffset
+        self.counter = 0
+        self.targetingBeamWidth = 5
+        self.targetingBeamHalfLength = 1500
+        self.targetingBeamOpacity = 100
+        self.targetingBeamCenterX = app.playerObject.centerX - self.xOffset
+        self.targetingBeamCenterY = app.playerObject.centerY - self.yOffset
+        self.targetingBeamX_1 = self.targetingBeamCenterX - (math.cos(self.fireAngleRad) * self.targetingBeamHalfLength)
+        self.targetingBeamY_1 = self.targetingBeamCenterY - (math.sin(self.fireAngleRad) * self.targetingBeamHalfLength)
+        self.targetingBeamX_2 = self.targetingBeamCenterX + (math.cos(self.fireAngleRad) * self.targetingBeamHalfLength)
+        self.targetingBeamY_2 = self.targetingBeamCenterY + (math.sin(self.fireAngleRad) * self.targetingBeamHalfLength)
+        self.name = name
+        self.drawTargetingBeam = True
+        self.initiatedProjectile = False
+        self.deleteMe = False      
+
+    def fireLazer(self,app):
+        app.projectile[self.name] = Linear(self.name,0,500,100,3,100,0,(self.targetingBeamX_1 + self.xOffset), (self.targetingBeamY_1 + self.yOffset), (self.targetingBeamX_2 + self.xOffset), (self.targetingBeamY_2 + self.yOffset),False)
+        app.projectile[self.name].ignoreScreenBounds = True
+        app.projectile[self.name].imagePath = 'images/insidiousCreature/lazer.png'
+        # print('added projectile:',self.name,'to active map projectiles')
+        app.activeMapProjectiles.append(self.name)
+        initiateProjectile(app,self.name)
+        
+    def draw(self):
+        if(self.drawTargetingBeam):
+            # print('drawing lazer!')
+            drawLine((self.targetingBeamX_1 + self.xOffset), (self.targetingBeamY_1 + self.yOffset), (self.targetingBeamX_2 + self.xOffset), (self.targetingBeamY_2 + self.yOffset), fill = 'red', lineWidth = self.targetingBeamWidth, opacity = self.targetingBeamOpacity)
+
+    def update(self,other,app):
+        self.xOffset = other.xOffset
+        self.yOffset = other.yOffset
+        if(self.drawTargetingBeam):
+            self.targetingBeamOpacity -= 5
+            if(self.targetingBeamOpacity <= 0):
+                self.drawTargetingBeam = False
+                self.fireLazer(app)
+    
+    def __hash__(self):
+        return hash(str(self))
 
 # ---- ENEMIES ----
 class Enemy:
@@ -357,17 +407,43 @@ class InsidiousCreature(Enemy):
         self.multiples = dict()
         # etablishing instances of MultipleData as values in the multiples dict
         self.multiples['tooth'] = self.MultipleData('tooth','images/insidiousCreature/tooth.png',3)
-        self.multiples['tooth'].checkSet = self.multiples['tooth'].checkSet
+        self.multiples['bigTooth'] = self.MultipleData('bigTooth','images/insidiousCreature/bigTooth.png',5)
         self.multiples['manaPickup'] = self.MultipleData('manaPickup','images/pickups/manaPickup.png',15)
         self.multiples['healthPickup'] = self.MultipleData('healthPickup','images/pickups/healthPickup.png',15)
+        self.multiples['lazer'] = self.MultipleData('lazer','images/insidiousCreature/lazer.png',10)
         self.attackCounter = 1
         self.attackSpeed = 20
+        self.attackAngle = 0
         self.healthCheckpoint = 0
-        self.phaseCheckpoint = 750
+        self.phaseCheckpoint = 800
         self.dxPlayer = 0
-        self.pickupSpawnRadius = 250
+        self.pickupSpawnRadius = 300
+        self.chargeSpeed = 500
+        self.chargeThrust = 1000
+        self.chargeDuration = 15 # in steps
+        self.charging = False
+        self.returning = False
+        self.chargeStartingX = 0
+        self.chargeStartingY = 0
+        self.chargeAngle = 0
+        self.targetRotationSpeed = 0
+        self.rotationSpeed = 0
+        self.rotationAcceleration = 0
+        # initialzing active lazer dictionary
+        self.activeLazers = dict()
+        self.boundingBoxSetRadius = 0
     
     def move(self,app):
+        # establishing radius, and position data
+        self.playerRadius = getDistance((self.xPosition + self.xOffset), (self.yPosition + self.yOffset), app.playerObject.xPosition, app.playerObject.yPosition)
+        self.dxPlayer = (self.xPosition + self.xOffset) - app.playerObject.xPosition
+        self.dyPlayer = (self.yPosition + self.yOffset) - app.playerObject.yPosition
+
+        # setting rotation
+        self.displayAngle += self.rotationSpeed
+        self.displayAngle %= 360
+        
+        # rise up at beginning, right after awakening
         if(self.subphase == 'rise'):
             if(self.yPosition > (app.ti['ground'].initialTileYPosition - 150)):
                 app.icPhysics['y'].currentThrust += 5
@@ -378,11 +454,12 @@ class InsidiousCreature(Enemy):
             else:
                 self.invulnerable = False
                 self.subphase = 'chase'
+        
+        # chase behavior, follow player
         elif(self.subphase == 'chase'):
-            dx = (self.xPosition + self.xOffset) - app.playerObject.xPosition
-            if(dx < -self.playerHoverDistance):
+            if(self.dxPlayer < -self.playerHoverDistance):
                 app.icPhysics['x'].currentThrust = -500
-            elif(dx > self.playerHoverDistance):
+            elif(self.dxPlayer > self.playerHoverDistance):
                 app.icPhysics['x'].currentThrust = 500
             else:
                 app.icPhysics['x'].currentThrust = 0
@@ -396,39 +473,166 @@ class InsidiousCreature(Enemy):
                 app.icPhysics['y'].currentThrust = dy * 2
             else:
                 app.icPhysics['y'].currentThrust = 0
-            self.dxPlayer = dx
+        
+        # charge at player
+        elif(self.subphase == 'charge'):
+            if(self.charging == False):
+                self.chargeAngle = getAngle(-self.dxPlayer, -self.dyPlayer, 'radians')
+                self.charging = True
+            app.icPhysics['x'].currentThrust = math.cos(self.chargeAngle) * self.chargeThrust
+            app.icPhysics['y'].currentThrust = math.sin(self.chargeAngle) * self.chargeThrust
+        
+        # return to starting position
+        elif(self.subphase == 'return'):
+            self.returning = True
+            app.icPhysics['x'].currentThrust = math.cos(self.chargeAngle) * -(self.chargeThrust/2)
+            app.icPhysics['y'].currentThrust = math.sin(self.chargeAngle) * -(self.chargeThrust/2)
+            runPhysicsCalculations(app.icPhysics['x'])   
+            runPhysicsCalculations(app.icPhysics['y'])
+            self.xPosition -= app.icPhysics['x'].currentVelocity
+            self.yPosition -= app.icPhysics['y'].currentVelocity
+            if((abs(self.xPosition - self.chargeStartingX) <= abs(app.icPhysics['x'].currentVelocity)) or (abs(self.yPosition - self.chargeStartingY) <= abs(app.icPhysics['y'].currentVelocity))):
+                self.xPosition = self.chargeStartingX
+                self.yPosition = self.chargeStartingY
+                self.returning = False
+                self.subphase = 'chase'
+
+        # reset thrust to 0                        
         else:
             app.icPhysics['x'].currentThrust = 0
             app.icPhysics['y'].currentThrust = 0
 
-        runPhysicsCalculations(app.icPhysics['x'])   
-        runPhysicsCalculations(app.icPhysics['y'])
-        # ptc("app.icPhysics['y'].currentVelocity",app.icPhysics['y'].currentVelocity)
-        self.xPosition -= app.icPhysics['x'].currentVelocity
-        self.yPosition -= app.icPhysics['y'].currentVelocity
+        # return behavior already handles calculations and position update, 
+        # don't run them twice
+        if(not (self.subphase == 'return')):
+            # run physics calculations and update position
+            runPhysicsCalculations(app.icPhysics['x'])   
+            runPhysicsCalculations(app.icPhysics['y'])
+            # ptc("app.icPhysics['y'].currentVelocity",app.icPhysics['y'].currentVelocity)
+            self.xPosition -= app.icPhysics['x'].currentVelocity
+            self.yPosition -= app.icPhysics['y'].currentVelocity
 
     def attackCoordinator(self,app):
+        # phase 1 attacks and behaviors
         if((self.phase == 1) and (self.subphase == 'chase')):
+            # managing rectangular bounding box
             if(app.boundingBox == None):
-                app.boundingBox = BoundingBox(self.xPosition, self.yPosition, self.xOffset, self.yOffset, self.dxPlayer, 2500, 1750, 3)
+                app.boundingBox = RectBoundingBox(self.xPosition, self.yPosition, self.xOffset, self.yOffset, 2500, 1750, 3)
             else:
-                app.boundingBox.align(self.xPosition, self.yPosition, self.xOffset, self.yOffset, self.dxPlayer)
+                app.boundingBox.syncOffsets(self)
+                app.boundingBox.align(self.xPosition, self.yPosition,self.dxPlayer)
+            # managing tooth attack
             if((self.attackCounter % self.attackSpeed) == 0):
                 self.fireTooth(app)
                 self.attackCounter = 0
             self.attackCounter += 1
+            # detecting when to change the tooth attack speed
             if(self.health <= self.healthCheckpoint):
                 self.attackSpeed -= 2
-                self.healthCheckpoint -= 45
+                self.healthCheckpoint -= 125
                 print('changed attack speed, now', self.attackSpeed)
                 print('new health checkpoint:',self.healthCheckpoint)
+        
+        # phase 2 attacks and behaviors
+        elif((self.phase == 2)):
+            # managing circular bounding box
+            self.boundingBoxSetRadius = 1000
+            if(app.boundingBox == None):
+                # also initializing attack speed
+                self.attackSpeed = 30
+                app.boundingBox = CircBoundingBox(self.xPosition, self.yPosition, self.xOffset, self.yOffset, (self.boundingBoxSetRadius * 5), 5)
+            else:
+                # sychorize x and y offsets between bounding box and boss
+                app.boundingBox.syncOffsets(self)
+                # starting the display radius at a larger value, and
+                # progressively shrinking it at the start of phase 2
+                if(app.boundingBox.displayRadius > self.boundingBoxSetRadius):
+                    app.boundingBox.displayRadius = max((app.boundingBox.displayRadius*(0.9))-1, self.boundingBoxSetRadius)
+                # only passing the rest of the data when the boss is NOT 
+                # charging, since I want the bounding box to stay where it was 
+                # when the boss started to charge
+                if(self.subphase == 'chase'):
+                    app.boundingBox.align(self.xPosition,self.yPosition,self.playerRadius)
+            # handling lazer attack
+            if(self.subphase == 'chase'):
+                if((self.attackCounter % self.attackSpeed) == 0):
+                    self.fireLazer(app)
+                    self.attackCounter = 0
+                self.attackCounter += 1
+            # initalizing charge
+            if((self.subphaseCounter % self.chargeSpeed) == 0):
+                print('charging!')
+                self.subphase = 'startCharge'
+                self.subphaseCounter = 1
+                self.attackCounter = 1
+                self.targetRotationSpeed = 25
+                self.rotationSpeed = 1
+                self.rotationAcceleration = 1.04
+                self.chargeStartingX = self.xPosition
+                self.chargeStartingY = self.yPosition
+            # starting rotation
+            if(self.subphase == 'startCharge'):
+                self.rotationSpeed = min((self.rotationSpeed * self.rotationAcceleration), self.targetRotationSpeed)
+                if(self.rotationSpeed == self.targetRotationSpeed):
+                    self.subphase = 'charge'
+                    self.targetRotationSpeed = 0
+                    self.rotationAcceleration = 0.95
+            # iterating attack counter and stopping charge when done
+            elif(self.subphase == 'charge'):
+                if((self.attackCounter % self.chargeDuration) == 0):
+                    self.subphase = 'return'
+                    self.attackCounter = 0
+                    self.charging = False
+                self.attackCounter += 1
+            # stopping the rotation once the charge is finished
+            elif(self.subphase == 'return'):
+                self.attackCounter = 1
+                if(self.rotationSpeed != 0):
+                    self.rotationSpeed = max((self.rotationSpeed * self.rotationAcceleration)-1, self.targetRotationSpeed)
+        
+        # phase 3 attacks and behaviors
+        elif((self.phase == 3)):
+            # managing circular bounding box
+            self.boundingBoxSetRadius = 800
+            if(app.boundingBox == None):
+                # also initializing attack speed
+                self.attackSpeed = 2
+                app.boundingBox = CircBoundingBox(self.xPosition, self.yPosition, self.xOffset, self.yOffset, (self.boundingBoxSetRadius * 5), 10)
+            else:
+                # sychorize x and y offsets between bounding box and boss
+                app.boundingBox.syncOffsets(self)
+                # starting the display radius at a larger value, and
+                # progressively shrinking it at the start of phase 2
+                if(app.boundingBox.displayRadius > self.boundingBoxSetRadius):
+                    app.boundingBox.displayRadius = max((app.boundingBox.displayRadius*(0.9))-1, self.boundingBoxSetRadius)
+                # only passing the rest of the data when the boss is NOT 
+                # charging, since I want the bounding box to stay where it was 
+                # when the boss started to charge
+                app.boundingBox.align(self.xPosition,self.yPosition,self.playerRadius)
+            # handling attack
+            if((self.attackCounter % self.attackSpeed) == 0):
+                self.fireBigTooth(app,self.attackAngle)
+                self.attackCounter = 0
+                self.attackAngle += 10
+            self.attackCounter += 1
+
+        # updating active lazers
+        lazerDeleteSet = set()
+        for lazer in self.activeLazers:
+            self.activeLazers[lazer].update(self,app)
+            if(self.activeLazers[lazer].deleteMe):
+                lazerDeleteSet.add(lazer)
+        for lazer in lazerDeleteSet:
+            if(lazer in self.multiples['lazer'].activeInstances):
+                self.multiples['lazer'].activeInstances.remove(lazer)
+                del self.activeLazers[lazer]
 
     def fireTooth(self,app):
         # print('firing!')
         self.multiples['tooth'].currentValue = None
-        for tooth in self.multiples['tooth'].checkSet:
-            if(tooth not in self.multiples['tooth'].activeInstances):
-                self.multiples['tooth'].currentValue = tooth
+        for projectile in self.multiples['tooth'].checkSet:
+            if(projectile not in self.multiples['tooth'].activeInstances):
+                self.multiples['tooth'].currentValue = projectile
                 break
         if(self.multiples['tooth'].currentValue == None):
             return
@@ -440,7 +644,6 @@ class InsidiousCreature(Enemy):
         targetY = app.playerObject.centerY
         # factoring in overshoot, to make the projectile follow through more
         overshoot = 100
-        aimOffset = 15 # in degrees
         dx = targetX - initialX
         dy = targetY - initialY
         distance = getDistance(targetX, targetY, initialX, initialY)
@@ -450,6 +653,9 @@ class InsidiousCreature(Enemy):
             rotationAngle = math.radians(180) + (math.asin((dy)/distance))
         else:
             rotationAngle = (math.asin((-dy)/distance))
+
+        # adding in aim offset, to give projectiles a bit of variation
+        aimOffset = 15
         rotationAngle += math.radians(random.randint(-aimOffset, aimOffset))
         targetX -= math.cos(rotationAngle) * overshoot
         targetY -= math.sin(rotationAngle) * overshoot
@@ -460,12 +666,55 @@ class InsidiousCreature(Enemy):
         # ptc('targetY',targetY)
 
         app.projectile[self.multiples['tooth'].currentValue] = Linear(self.multiples['tooth'].currentValue,0,250,250,0.5,10,0,initialX,initialY,targetX,targetY,False)
+        app.projectile[self.multiples['tooth'].currentValue].displayAngle = rotationAngle
         app.projectile[self.multiples['tooth'].currentValue].imagePath = self.multiples['tooth'].imagePath
-        app.projectile[self.multiples['tooth'].currentValue].drawFirst = True
-        # print('added projectile:',self.multiples['tooth'].currentValue,'to active map projectiles')
+        # print('added projectile:',self.multiples[projectileName].currentValue,'to active map projectiles')
         app.activeMapProjectiles.append(self.multiples['tooth'].currentValue)
         initiateProjectile(app,self.multiples['tooth'].currentValue)
-        self.multiples['tooth'].activeInstances.add(self.multiples['tooth'].currentValue)
+        self.multiples['tooth'].activeInstances.add(self.multiples['tooth'].currentValue)        
+
+    def fireBigTooth(self,app,angle):
+        # print('firing big tooth!')
+        self.multiples['bigTooth'].currentValue = None
+        for projectile in self.multiples['bigTooth'].checkSet:
+            if(projectile not in self.multiples['bigTooth'].activeInstances):
+                self.multiples['bigTooth'].currentValue = projectile
+                break
+        if(self.multiples['bigTooth'].currentValue == None):
+            return
+        # print('current tooth:',self.multiples['bigTooth'].currentValue)
+        # setting up initial position and target position
+        initialX = self.xPosition + self.xOffset + (math.cos(math.radians(angle)) * self.boundingBoxSetRadius * (0.5))
+        initialY = self.yPosition + self.yOffset + (math.sin(math.radians(angle)) * self.boundingBoxSetRadius * (0.5))
+        targetX = initialX + (math.cos(math.radians(angle)) * self.boundingBoxSetRadius)
+        targetY = initialY + (math.sin(math.radians(angle)) * self.boundingBoxSetRadius)
+        initialX += (math.cos(math.radians(angle)) * self.boundingBoxSetRadius * (0.5))
+        initialY += (math.sin(math.radians(angle)) * self.boundingBoxSetRadius * (0.5))
+         
+        # ptc('initialX',initialX)
+        # ptc('initialY',initialY)
+        # ptc('targetX',targetX)
+        # ptc('targetY',targetY)
+
+        app.projectile[self.multiples['bigTooth'].currentValue] = Linear(self.multiples['bigTooth'].currentValue,0,750,250,1,10,0,initialX,initialY,targetX,targetY,False)
+        app.projectile[self.multiples['bigTooth'].currentValue].displayAngle = angle
+        app.projectile[self.multiples['bigTooth'].currentValue].ignoreScreenBounds = True
+        app.projectile[self.multiples['bigTooth'].currentValue].imagePath = self.multiples['bigTooth'].imagePath
+        # print('added projectile:',self.multiples[projectileName].currentValue,'to active map projectiles')
+        app.activeMapProjectiles.append(self.multiples['bigTooth'].currentValue)
+        initiateProjectile(app,self.multiples['bigTooth'].currentValue)
+        self.multiples['bigTooth'].activeInstances.add(self.multiples['bigTooth'].currentValue)    
+
+    def fireLazer(self,app):
+        self.multiples['lazer'].currentValue = None
+        for projectile in self.multiples['lazer'].checkSet:
+            if(projectile not in self.multiples['lazer'].activeInstances):
+                self.multiples['lazer'].currentValue = projectile
+                break
+        if(self.multiples['lazer'].currentValue == None):
+            return
+        self.multiples['lazer'].activeInstances.add(self.multiples['lazer'].currentValue)
+        self.activeLazers[self.multiples['lazer'].currentValue] = (InsidiousCreatureLazer(app,self.multiples['lazer'].currentValue,self.xOffset,self.yOffset))
 
     def updateImage(self,app):
         if(self.phase == 0):
@@ -477,8 +726,13 @@ class InsidiousCreature(Enemy):
                 self.imagePath = 'images/insidiousCreature/eyesOpen.png'
             else:
                 self.imagePath = 'images/insidiousCreature/phase_2.png'
-
-    def spawnPickups(self,pickupType,quantity,app):
+        elif(self.phase == 3):
+            if(self.subphase == 'phaseChange_3'):
+                self.imagePath = 'images/insidiousCreature/phase_2.png'
+            else:
+                self.imagePath = 'images/insidiousCreature/phase_3.png'
+                
+    def spawnPickups(self,pickupType,quantity,restorationAmmount,app):
         for i in range(quantity):
             self.multiples[pickupType].currentValue = None
             for pickup in self.multiples[pickupType].checkSet:
@@ -490,10 +744,10 @@ class InsidiousCreature(Enemy):
             rotationAngle = math.radians(random.randint(0,360))
             initialX = self.xPosition + self.xOffset + (math.cos(rotationAngle) * self.pickupSpawnRadius)
             initialY = self.yPosition + (math.sin(rotationAngle) * self.pickupSpawnRadius)
-            ptc('initialX',initialX)
-            ptc('initialY',initialY)
-            print(self.multiples[pickupType].currentValue)
-            app.pickups[self.multiples[pickupType].currentValue] = Pickup(app,pickupType,self.multiples[pickupType].currentValue,self.multiples[pickupType].imagePath,50,50,1,initialX,initialY,0,self.yOffset,100,'center')
+            # ptc('initialX',initialX)
+            # ptc('initialY',initialY)
+            # print(self.multiples[pickupType].currentValue)
+            app.pickups[self.multiples[pickupType].currentValue] = Pickup(app,pickupType,self.multiples[pickupType].currentValue,restorationAmmount,self.multiples[pickupType].imagePath,50,50,1,0,initialX,initialY,0,self.yOffset,100,'center')
             self.multiples[pickupType].activeInstances.add(self.multiples[pickupType].currentValue)
 
     def updateState(self,app):
@@ -504,7 +758,7 @@ class InsidiousCreature(Enemy):
             self.phase = 1
             self.subphase = 'rise'
             self.health = self.maxHealth
-            self.healthCheckpoint = self.maxHealth - 45
+            self.healthCheckpoint = self.maxHealth - 60
             self.invulnerable = True
         
         # deactivate boss if dead
@@ -516,8 +770,9 @@ class InsidiousCreature(Enemy):
         
         # switching phase
         if(self.health <= self.phaseCheckpoint):
+            app.boundingBox = None
             self.phase += 1
-            self.phaseCheckpoint = 250
+            self.phaseCheckpoint = max((self.phaseCheckpoint - 700), 0)
             self.subphase = f'phaseChange_{self.phase}'
             print('new Phase!', self.phase)
             print('new phase checkpoint:', self.phaseCheckpoint)
@@ -525,18 +780,34 @@ class InsidiousCreature(Enemy):
             x = self.xPosition + self.xOffset
             y = self.yPosition
             self.subphaseCounter = 0
-            app.simpleAnimations.append(SimpleAnimation(app,framelist,3,True,750,750,0,'center',x,y,True,0.1))
             self.invulnerable = True
-            self.spawnPickups('manaPickup',3,app)
-            self.spawnPickups('healthPickup',3,app)
+            if(self.phase == 2):
+                app.lightSources.append(LightSource(20,255,x,y,0.95))
+                app.simpleAnimations.append(SimpleAnimation(app,framelist,3,True,750,750,0,'center',x,y,True,0.1))
+                self.spawnPickups('manaPickup',3,10,app)
+                self.spawnPickups('healthPickup',3,20,app)
+            elif(self.phase == 3):
+                self.displayAngle = 0
+                for i in range(5):
+                    app.simpleAnimations.append(SimpleAnimation(app,framelist,3,True,750,750,0,'center',x,y,True,0.1))
+                app.lightSources.append(LightSource(20,255,x,y,0.95))
+                self.spawnPickups('manaPickup',5,15,app)
+                self.spawnPickups('healthPickup',5,25,app)
         
         # helping with subphase management and phase cutscenes
         if(self.phase != 0):
             self.subphaseCounter += 1
-            if((self.subphase == 'phaseChange_2') and self.subphaseCounter >= 10):
+            if((self.subphase == 'phaseChange_2') and self.subphaseCounter >= 40):
                 self.invulnerable = False
                 self.subphase = 'chase'
                 self.playerDamageOnHit = 35
+            if((self.subphase == 'phaseChange_3') and self.subphaseCounter >= 40):
+                self.invulnerable = False
+                self.playerDamageOnHit = 20
+
+    def drawLazers(self):
+        for lazer in self.activeLazers:
+            self.activeLazers[lazer].draw()
 
     def __hash__(self):
         return hash(str(self))
@@ -599,17 +870,21 @@ class TheHideousBeast(Enemy):
 
 # ---- BOUNDING BOX ---- 
 class BoundingBox:
-    def __init__(self,xPosition,yPosition,xOffset,yOffset,dx,width,height,outOfBoundsDamage):
+    def __init__(self,xPosition,yPosition,xOffset,yOffset,outOfBoundsDamage):
         self.xPosition = xPosition
         self.yPosition = yPosition
         self.initialXPosition = xPosition
         self.initialYPosition = yPosition
         self.xOffset = xOffset
         self.yOffset = yOffset
+        self.outOfBoundsDamage = outOfBoundsDamage
         self.dxPlayer = 0
+    
+class RectBoundingBox(BoundingBox):
+    def __init__(self,xPosition,yPosition,xOffset,yOffset,width,height,outOfBoundsDamage):
+        super().__init__(xPosition,yPosition,xOffset,yOffset,outOfBoundsDamage)
         self.width = width
         self.height = height
-        self.outOfBoundsDamage = outOfBoundsDamage
         self.verticalImagePath = 'images/boundingBox/vertical.png'
         self.horizontalImagePath = 'images/boundingBox/horizontal.png'
         self.borderWidth = 50
@@ -622,11 +897,13 @@ class BoundingBox:
         self.top = self.yPosition - int(self.height // 2)
         self.bottom = self.yPosition + int(self.height // 2)
 
-    def align(self,otherX,otherY,otherXOffset,otherYOffset,otherDxPlayer):
+    def syncOffsets(self,other):
+        self.xOffset = other.xOffset
+        self.yOffset = other.yOffset
+
+    def align(self,otherX,otherY,otherDxPlayer):
         self.xPosition = otherX
         self.yPosition = otherY
-        self.xOffset = otherXOffset
-        self.yOffset = otherYOffset
         self.dxPlayer = otherDxPlayer
         self.getBorderPositions()
 
@@ -645,6 +922,35 @@ class BoundingBox:
         drawImage(self.verticalImagePath, self.right + self.xOffset, self.yPosition + self.yOffset, width = self.borderWidth, height = self.height, align = 'center')
         drawImage(self.horizontalImagePath, self.xPosition + self.xOffset, self.top + self.yOffset, width = self.width, height = self.borderHeight, align = 'center')
         drawImage(self.horizontalImagePath, self.xPosition + self.xOffset, self.bottom + self.yOffset, width = self.width, height = self.borderHeight, align = 'center')
+    
+class CircBoundingBox(BoundingBox):
+    def __init__(self,xPosition,yPosition,xOffset,yOffset,displayRadius,outOfBoundsDamage):
+        super().__init__(xPosition,yPosition,xOffset,yOffset,outOfBoundsDamage)
+        self.displayRadius = displayRadius
+        self.imagePath = 'images/boundingBox/circular.png'
+        self.playerRadius = 0
+
+    def syncOffsets(self,other):
+        self.xOffset = other.xOffset
+        self.yOffset = other.yOffset
+
+    def align(self,otherX,otherY,otherPlayerRadius):
+        self.xPosition = otherX
+        self.yPosition = otherY
+        self.playerRadius = otherPlayerRadius
+
+    def checkPlayerLocation(self,app):
+        # print(self.dxPlayer)
+        if(self.playerRadius >= self.displayRadius):
+            # print(self.xPosition + self.xOffset)
+            # print('out of bounds!')
+            if(app.playerImmunityFrames == 0):
+                app.playerHealth = max((app.playerHealth - self.outOfBoundsDamage), 0)
+                app.screenShakeMagnitude += 5
+                app.playerImmunityFrames += self.outOfBoundsDamage*3
+
+    def draw(self):
+        drawImage(self.imagePath, self.xPosition + self.xOffset, self.yPosition + self.yOffset, width = (self.displayRadius * 2), height = (self.displayRadius * 2), align = 'center')
 
 # ---- SIMPLE ANIMATION ----
 class SimpleAnimation:
@@ -693,16 +999,17 @@ class SimpleAnimation:
 
 # ---- OVERLAY ----
 class Overlay:
-    def __init__(self,imagePath,imageWidth,imageHeight,imageScale,xPosition,yPosition,xOffset,yOffset,opacity,alignment):
+    def __init__(self,imagePath,imageWidth,imageHeight,imageScale,displayAngle,xPosition,yPosition,xOffset,yOffset,opacity,alignment):
         self.imagePath = imagePath
         self.imageWidth = imageWidth
         self.imageHeight = imageHeight
         self.imageScale = imageScale
         self.displayWidth = int(imageWidth * imageScale)
         self.displayHeight = int(imageHeight * imageScale)
-        self.xOffset = xOffset
+        self.displayAngle = displayAngle
         self.xPosition = xPosition
         self.yPosition = yPosition
+        self.xOffset = xOffset
         self.yOffset = yOffset
         self.opacity = opacity
         self.displayWidth // 2
@@ -718,15 +1025,18 @@ class Overlay:
         bottom = app.bottom + (self.displayHeight // 2)
         # actually drawing
         if((left < x < right) and (top < y < bottom)):
-            drawImage(self.imagePath, x + app.screenShakeX, y + app.screenShakeY, width = self.displayWidth, height = self.displayHeight, opacity = self.opacity, align = self.alignment)
+            drawImage(self.imagePath, x + app.screenShakeX, y + app.screenShakeY, width = self.displayWidth, height = self.displayHeight, opacity = self.opacity, rotateAngle = self.displayAngle, align = self.alignment)
 
 # ---- PICKUPS ----
 class Pickup(Overlay):
-    def __init__(self,app,pickupType,name,imagePath,imageWidth,imageHeight,imageScale,xPosition,yPosition,xOffset,yOffset,opacity,alignment):
-        super().__init__(imagePath,imageWidth,imageHeight,imageScale,xPosition,yPosition,xOffset,yOffset,opacity,alignment)
+    def __init__(self,app,pickupType,name,restorationAmmount,imagePath,imageWidth,imageHeight,imageScale,displayAngle,xPosition,yPosition,xOffset,yOffset,opacity,alignment):
+        super().__init__(imagePath,imageWidth,imageHeight,imageScale,displayAngle,xPosition,yPosition,xOffset,yOffset,opacity,alignment)
         self.pickupType = pickupType
+        self.name = name
         self.radius = int(20 * self.imageScale)
-        self.hitbox = initiateHitbox(app,name,self,'enemy',0,0,'hitboxCircle')
+        self.hitbox = initiateHitbox(app,name,self,'pickup',0,0,'hitboxCircle')
+        self.restorationAmmount = restorationAmmount
+        self.deleteMe = False
 
 # ---- HITBOXES ----
 class Hitbox:
@@ -871,6 +1181,21 @@ def tempDisplayReadout(app,inputList):
         lineYPosition -= lineSpacing
 
 # GENERAL HELPER FUNCTIONS
+# function to get justified angle based off of dx and dy
+def getAngle(dx,dy,outputType):
+    distance = (((dx ** 2) + (dy ** 2)) ** (0.5))
+    if(distance == 0):
+        distance = 0.001
+    if(dx > 0):
+        if(outputType == 'degrees'):
+            return 180 + math.degrees(math.asin((dy)/distance))
+        else:
+            return math.radians(180) + math.asin((dy)/distance)
+    else:
+        if(outputType == 'degrees'):
+            return math.degrees(math.asin((-dy)/distance))
+        else: 
+            return math.asin((-dy)/distance)
 
 def checkConvexPolygonIntersection(vertexList_1,vertexList_2):
     # Polygon intersection referenced from https://www.gorillasun.de/blog/an-algorithm-for-polygon-intersections/
@@ -2045,7 +2370,7 @@ def drawSpell(app,spellName):
 # actually plays the effect of the spell
 def activateSpellEffect(app,spellName):
     if(spellName == 'testLightSpell'):
-        app.lightSources.append(LightSource(3,255,(app.spells[spellName].targetX/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),0.95))
+        app.lightSources.append(LightSource(3,255,(app.spells[spellName].targetX/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),0.95))
     elif(spellName == 'levelOneSlimeBall'):
         frameList = ['images/spells/levelOneSlimeBallEndAnimation_0.png','images/spells/levelOneSlimeBallEndAnimation_1.png','images/spells/levelOneSlimeBallEndAnimation_2.png']
         displayWidth = app.spells[spellName].displayWidth
@@ -2061,7 +2386,7 @@ def drawProjectile(app,projectileName):
         totalXPosition = (app.projectile[projectileName].xPosition+app.projectile[projectileName].xOffset)
         totalYPosition = (app.projectile[projectileName].yPosition+app.projectile[projectileName].yOffset)
         # print('totalYPosition:',totalYPosition)
-        if onScreen(app, totalXPosition, totalYPosition, app.projectile[projectileName].drawBuffer):
+        if((onScreen(app, totalXPosition, totalYPosition, app.projectile[projectileName].drawBuffer)) or app.projectile[projectileName].ignoreScreenBounds):
             # print(f'projectile: {projectileName}, image: {app.projectile[projectileName].imagePath}')
             # print('xPosition:',app.projectile[projectileName].xPosition)
             # print('yPosition:',app.projectile[projectileName].yPosition)
@@ -2084,6 +2409,10 @@ def updateProjectiles(app):
                 activateSpellEffect(app,projectileName)
             elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['tooth'].checkSet)):
                 app.enemies['insidiousCreature'].multiples['tooth'].activeInstances.remove(projectileName)
+            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['lazer'].checkSet)):
+                app.enemies['insidiousCreature'].activeLazers[projectileName].deleteMe = True
+            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['bigTooth'].checkSet)):
+                app.enemies['insidiousCreature'].multiples['bigTooth'].activeInstances.remove(projectileName)
             app.activeMapProjectiles.remove(projectileName)
             del app.projectile[projectileName]
             # print('removed map projectile:',projectileName)
@@ -2128,6 +2457,26 @@ def initiateProjectile(app,projectileName):
         xAdjustment = int(p.displayWidth * 0)
         yAdjustment = int(p.displayWidth * 0.75)
         # print('added new tooth!',projectileName)
+        initiateHitbox(app,projectileName,p,'enemy',xAdjustment,yAdjustment,'hitboxAngledRect')
+    elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['lazer'].checkSet)):
+        p = app.projectile[projectileName]
+        p.directionalAcceleration = 10
+        p.maxVelocity = 1000
+        p.damage = 10
+        p.initialYOffset = app.ti['ground'].yOffset
+        xAdjustment = int(p.displayWidth * 0)
+        yAdjustment = int(p.displayHeight * 0.7)
+        # print('added new lazer!',projectileName)
+        initiateHitbox(app,projectileName,p,'enemy',xAdjustment,yAdjustment,'hitboxAngledRect')
+    elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['bigTooth'].checkSet)):
+        p = app.projectile[projectileName]
+        p.directionalAcceleration = 10
+        p.maxVelocity = 100
+        p.damage = 25
+        p.initialYOffset = app.ti['ground'].yOffset
+        xAdjustment = int(p.displayWidth * 0)
+        yAdjustment = int(p.displayHeight * 0.2)
+        # print('added new lazer!',projectileName)
         initiateHitbox(app,projectileName,p,'enemy',xAdjustment,yAdjustment,'hitboxAngledRect')
     elif(projectileName == 'levelOneSlimeBall'):
         p = app.projectile[projectileName]
@@ -2186,7 +2535,7 @@ def initiateTheHideousBeast(app,Physics):
 def initiateInsidiousCreature(app,Physics):
     initialX = app.screenWidth * 1.5
     initialY = app.ti['ground'].initialTileYPosition-80
-    app.enemies['insidiousCreature'] = InsidiousCreature('insidiousCreature',0,500,500,0.6,'center',100,0,initialX,initialY,1000,15)
+    app.enemies['insidiousCreature'] = InsidiousCreature('insidiousCreature',0,500,500,0.6,'center',100,0,initialX,initialY,1500,15)
 
     # establishing the hitbox radius for the Insidious Creature
     app.enemies['insidiousCreature'].radius = int(app.enemies['insidiousCreature'].displayWidth * 0.4)
@@ -2402,6 +2751,16 @@ def drawGui(app):
     if(app.startCutsceneOverlayOpacity != 0):
         drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.startCutsceneOverlayOpacity)  
 
+# PICKUPS
+def deletePickups(app):
+    deleteSet = set()
+    for pickup in app.pickups:
+        if(app.pickups[pickup].deleteMe):
+            deleteSet.add(pickup)
+    for pickup in deleteSet:
+        del app.hitbox[pickup]
+        del app.pickups[pickup]
+
 # SCREEN SHAKE
 def updateScreenShake(app):
     if(app.screenShakeMagnitude != 0):
@@ -2450,13 +2809,7 @@ def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,h
         height = int(associatedObject.displayHeight) - yAdjustment
         dx = targetX - centerX
         dy = targetY - centerY
-        distance = getDistance(centerX, centerY, targetX, targetY)
-        if(distance == 0):
-            distance = 0.001
-        if(dx > 0):
-            rotationAngle = 180 + math.degrees(math.asin((dy)/distance))
-        else:
-            rotationAngle = math.degrees(math.asin((-dy)/distance))
+        rotationAngle = getAngle(dx, dy, 'degrees')
         # ptc('rotationAngle',rotationAngle)
         [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(centerX, centerY, width, height, rotationAngle)
         app.hitbox[name] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4)
@@ -2526,6 +2879,25 @@ def triggerCollisionEffect(app,hitbox_1,hitbox_2):
                 app.playerHealth = max((app.playerHealth - otherHitbox.associatedObject.damage), 0)
                 otherHitbox.associatedObject.deleteMe = True
                 app.screenShakeMagnitude += 2
+                # if the enemy projectile is a lazer we want to delete the lazer object too
+                # print(otherHitbox.associatedObject.name)
+                # print(app.enemies['insidiousCreature'].multiples['lazer'].activeInstances)
+                if(('insidiousCreature' in app.enemies) and (otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['lazer'].activeInstances)):
+                    app.enemies['insidiousCreature'].activeLazers[otherHitbox.associatedObject.name].deleteMe = True
+                    # print('removed lazer on hit')
+        # check collisions with pickups
+        elif(otherHitbox.belongsTo == 'pickup'):
+            pickup = otherHitbox.associatedObject
+            # check mana pickup
+            if(pickup.pickupType == 'manaPickup'):
+                # print('collided with mana pickup!')
+                app.playerMana = min(app.playerMana + pickup.restorationAmmount, app.playerMaxMana)
+                pickup.deleteMe = True
+            # check health pickup
+            elif(pickup.pickupType == 'healthPickup'):
+                # print('collided with health pickup!')
+                app.playerHealth = min(app.playerHealth + pickup.restorationAmmount, app.playerMaxHealth)
+                pickup.deleteMe = True
     
     # check collisions with enemy
     elif(isinstance(hitbox_1.associatedObject, Enemy) or isinstance(hitbox_2.associatedObject, Enemy)):
@@ -2573,7 +2945,13 @@ def triggerCollisionEffect(app,hitbox_1,hitbox_2):
                 shieldHitbox.associatedObject.opacity = 0
                 app.removeShield = True
             elif(isinstance(otherHitbox.associatedObject, Projectile)):
-                otherHitbox.associatedObject.deleteMe = True
+                # ignoring shield if contacted lazer or big tooth
+                if('insidiousCreature' in app.enemies):
+                    if(not((otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['lazer'].activeInstances) or (otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['bigTooth'].activeInstances))):
+                        otherHitbox.associatedObject.deleteMe = True
+                        app.removeShield = True
+                else:
+                    otherHitbox.associatedObject.deleteMe = True
                 shieldHitbox.associatedObject.opacity -= 50
                 if(shieldHitbox.associatedObject.opacity <= 0):
                     shieldHitbox.associatedObject.opacity = 0
@@ -2815,8 +3193,11 @@ def onKeyPress(app,key):
 
     if(app.gameState == 'main'):
         # TEMPORARY DEBUG KEY PRESSES
+        if(key == 'i'):
+            app.playerHealth = 10000
+            app.playerMaxHealth = 10000
         if(key == 'o'):
-            app.enemies['insidiousCreature'].health = 760
+            app.enemies['insidiousCreature'].health = app.enemies['insidiousCreature'].phaseCheckpoint + 5
         if(key == 'p'):
             app.displayHitboxes = not app.displayHitboxes
             # app.tempDisplayReadout = not app.tempDisplayReadou
@@ -3017,6 +3398,7 @@ def onStep(app):
         for hitboxName in app.hitbox:
             updateHitbox(app,app.hitbox[hitboxName])
         checkCollisions(app)
+        deletePickups(app)
         if(app.playerImmunityFrames != 0):
             app.playerImmunityFrames -= 1
         updateScreenShake(app)
@@ -3032,6 +3414,8 @@ def redrawAll(app):
             app.overlays[overlay].draw(app)
         for pickup in app.pickups:
             app.pickups[pickup].draw(app)
+        if('insidiousCreature' in app.enemies):
+            app.enemies['insidiousCreature'].drawLazers()
         drawPlayer(app)
         drawSpellOrb(app)
         drawEnemies(app)
@@ -3448,8 +3832,7 @@ def gameSetup(app):
     app.removeShield = False
 
     # ---- PROJECTILE SETUP ----
-
-   # PROJECTILE CLASSES ARE ESTABLISHED GLOBALLY  
+    # PROJECTILE CLASSES ARE ESTABLISHED GLOBALLY  
 
     # initializing projectile dictionary
     app.projectile = dict()
@@ -3641,8 +4024,7 @@ def gameSetup(app):
 
     # initializing the final boss, Insidious Creature
     initiateInsidiousCreature(app,Physics)
-    
-    
+      
     # ---- BOUNDING BOX SETUP ---
     # establishing bounding box existence variable
     app.boundingBox = None
@@ -3672,7 +4054,7 @@ def gameSetup(app):
     # initiating overlay that goes below the insidious creature
     floorBloodX = app.enemies['insidiousCreature'].xPosition + 20
     floorBloodY = app.ti['ground'].initialTileYPosition
-    app.overlays['floorBlood'] = Overlay('images/insidiousCreature/floorBlood.png',1000,125,1.25,floorBloodX,floorBloodY,0,0,60,'top')
+    app.overlays['floorBlood'] = Overlay('images/insidiousCreature/floorBlood.png',1000,125,1.25,0,floorBloodX,floorBloodY,0,0,60,'top')
 
     # ---- PICKUP SETUP ----
     # initialzing pickups dictionary 
@@ -3711,7 +4093,7 @@ def gameSetup(app):
         updateTiles(app, tileableImageName)
     updatePlayerVelocity(app)
     lightmapSetup(app)
-    app.lightSources.append(LightSource(1,0,0,0,0,0.9))
+    app.lightSources.append(LightSource(1,0,0,0,0.9))
     updateLightmap(app,False)
     updateSpellOrb(app)
     setupCombos(app)

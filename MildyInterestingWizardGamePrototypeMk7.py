@@ -4,12 +4,7 @@
 
 # TODO:
 # ADD COOL LIGHTNING SPELL
-# FINAL BOSS ANIMATION & WIN CONDITION
 # VIDEO IS VERY IMPORTANT!!! WORK ON VIDEO!!!! WRITE DOWN KEY FEATURES OF CODE I WANT TO POINT OUT IN VIDEO
-# name wizard - Wizard Bossfight, firstname Wizard, lastname Bossfight
-# BUG TO MAYBE FIX: pausing screws with key presses
-# ADD FEATURE TO DISABLE TESTING FEATURES
-# FIGURE OUT BUG WITH FINAL ATTACK - WHY THE HECK DOES HITBOX SPAWN IN WRONG PLACE?
 
 # QUESTIONS FOR PROF TAYLOR:
 # HOW DO I DIRECTLY DELETE INSTANCES OF A CLASS
@@ -28,8 +23,6 @@ import math
 import numpy
 # random used for screenshake
 import random
-# copy used for copying lists
-import copy
 
 # CLASSES
 # ---- LIGHTING ----
@@ -46,10 +39,10 @@ class LightSource:
     def fade(self):
         self.intensity *= self.fadeRate
 
-
 # ---- SPELLS ---- 
 class Spell:
-    def __init__(self,spellType,combo,name,displayType,frames,imageWidth,imageHeight,imageScale,manaCost,drawBuffer):
+    def __init__(self,spellType,combo,name,displayType,frames,imageWidth,
+                 imageHeight,imageScale,manaCost,drawBuffer):
         # spells types can be 'aggressive' or 'defensive' 
         # one aggressive and one defensive spell can exist at a time
         # but you cannot cast one while the other is active
@@ -68,6 +61,7 @@ class Spell:
         # currently avaiable projectile types are:
         # - linear
         # - groundbounce
+        # - pointHoming
         self.projectileType = None
         self.animationFrames = frames
         self.animationCounter = 0
@@ -103,6 +97,8 @@ class Projectile:
         self.displayAngle = displayAngle
         self.xPosition = initialX
         self.yPosition = initialY
+        self.initialX = initialX
+        self.initialY = initialY
         self.targetX = targetX
         self.targetY = targetY
         self.xVelocity = 0
@@ -125,14 +121,6 @@ class Projectile:
         self.bottom = 0
         self.xAdjustment = 0
         self.yAdjustment = 0
-        self.x_1 = 0
-        self.y_1 = 0
-        self.x_2 = 0
-        self.y_2 = 0
-        self.x_3 = 0
-        self.y_3 = 0
-        self.x_4 = 0
-        self.y_4 = 0
         
 # initialzing linear projectile class - moves in a straight line
 class Linear(Projectile):
@@ -142,14 +130,9 @@ class Linear(Projectile):
         self.maxTravel = 0
         self.maxVelocity = 0
         self.directionAngle = None
-        self.initialX = initialX
-        self.initialY = initialY
     
     def move(self):
         if(self.directionAngle == None):
-            self.initialY -= self.initialYOffset
-            self.yPosition -= self.initialYOffset
-            self.targetY -= self.initialYOffset
             dx = (self.xPosition - self.targetX)
             dy = (self.yPosition - self.targetY)
             # print(dy)
@@ -179,11 +162,17 @@ class Linear(Projectile):
         self.xPosition += self.xVelocity
         self.yPosition += self.yVelocity
 
+        # print('projectile name:',self.name)
+        # ptc('self.xPosition',self.xPosition)
+        # ptc('self.yPosition',self.yPosition)
+        # ptc('y offset:',self.yOffset)
+
         distanceTravelled = getDistance(self.xPosition,self.yPosition,self.initialX,self.initialY)
         # print(distanceTravelled)
 
         return (distanceTravelled >= self.maxTravel)
 
+# initializing pointHoming projectile class - homes towards a initial point
 class PointHoming(Projectile):
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell):
         super().__init__(name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell)
@@ -304,10 +293,10 @@ class Groundbounce(Projectile):
 
         return ((self.timer >= self.lifespan) or (self.bounces >= self.maxBounces))
     
-# setting up class for the lazer beam attack in particular
-class InsidiousCreatureLazer:
+# setting up class for the laser beam attack in particular
+class InsidiousCreatureLaser:
     def __init__(self,app,name,xOffset,yOffset):
-        # print('fired lazer')
+        # print('fired laser')
         self.fireAngleDeg = random.randint(0,360)
         self.fireAngleRad = math.radians(self.fireAngleDeg)
         self.xOffset = xOffset
@@ -327,17 +316,17 @@ class InsidiousCreatureLazer:
         self.initiatedProjectile = False
         self.deleteMe = False      
 
-    def fireLazer(self,app):
-        app.projectile[self.name] = Linear(self.name,0,500,100,3,100,0,(self.targetingBeamX_1 + self.xOffset), (self.targetingBeamY_1 + self.yOffset), (self.targetingBeamX_2 + self.xOffset), (self.targetingBeamY_2 + self.yOffset),False)
+    def fireLaser(self,app):
+        app.projectile[self.name] = Linear(self.name,0,500,100,3,100,0,(self.targetingBeamX_1 + self.xOffset), (self.targetingBeamY_1), (self.targetingBeamX_2 + self.xOffset), (self.targetingBeamY_2),False)
         app.projectile[self.name].ignoreScreenBounds = True
-        app.projectile[self.name].imagePath = 'images/insidiousCreature/lazer.png'
+        app.projectile[self.name].imagePath = 'images/insidiousCreature/laser.png'
         # print('added projectile:',self.name,'to active map projectiles')
         app.activeMapProjectiles.append(self.name)
         initiateProjectile(app,self.name)
         
     def draw(self):
         if(self.drawTargetingBeam):
-            # print('drawing lazer!')
+            # print('drawing laser!')
             drawLine((self.targetingBeamX_1 + self.xOffset), (self.targetingBeamY_1 + self.yOffset), (self.targetingBeamX_2 + self.xOffset), (self.targetingBeamY_2 + self.yOffset), fill = 'red', lineWidth = self.targetingBeamWidth, opacity = self.targetingBeamOpacity)
 
     def update(self,other,app):
@@ -347,7 +336,7 @@ class InsidiousCreatureLazer:
             self.targetingBeamOpacity -= 5
             if(self.targetingBeamOpacity <= 0):
                 self.drawTargetingBeam = False
-                self.fireLazer(app)
+                self.fireLaser(app)
     
     def __hash__(self):
         return hash(str(self))
@@ -407,10 +396,10 @@ class InsidiousCreature(Enemy):
         self.multiples = dict()
         # etablishing instances of MultipleData as values in the multiples dict
         self.multiples['tooth'] = self.MultipleData('tooth','images/insidiousCreature/tooth.png',3)
-        self.multiples['bigTooth'] = self.MultipleData('bigTooth','images/insidiousCreature/bigTooth.png',5)
+        self.multiples['bigTooth'] = self.MultipleData('bigTooth','images/insidiousCreature/bigTooth.png',10)
         self.multiples['manaPickup'] = self.MultipleData('manaPickup','images/pickups/manaPickup.png',15)
         self.multiples['healthPickup'] = self.MultipleData('healthPickup','images/pickups/healthPickup.png',15)
-        self.multiples['lazer'] = self.MultipleData('lazer','images/insidiousCreature/lazer.png',10)
+        self.multiples['laser'] = self.MultipleData('laser','images/insidiousCreature/laser.png',5)
         self.attackCounter = 1
         self.attackSpeed = 20
         self.attackAngle = 0
@@ -429,8 +418,8 @@ class InsidiousCreature(Enemy):
         self.targetRotationSpeed = 0
         self.rotationSpeed = 0
         self.rotationAcceleration = 0
-        # initialzing active lazer dictionary
-        self.activeLazers = dict()
+        # initialzing active laser dictionary
+        self.activeLasers = dict()
         self.boundingBoxSetRadius = 0
     
     def move(self,app):
@@ -482,7 +471,7 @@ class InsidiousCreature(Enemy):
             app.icPhysics['x'].currentThrust = math.cos(self.chargeAngle) * self.chargeThrust
             app.icPhysics['y'].currentThrust = math.sin(self.chargeAngle) * self.chargeThrust
         
-        # return to starting position
+        # return to starting position prior to chase
         elif(self.subphase == 'return'):
             self.returning = True
             app.icPhysics['x'].currentThrust = math.cos(self.chargeAngle) * -(self.chargeThrust/2)
@@ -530,8 +519,8 @@ class InsidiousCreature(Enemy):
             if(self.health <= self.healthCheckpoint):
                 self.attackSpeed -= 2
                 self.healthCheckpoint -= 125
-                print('changed attack speed, now', self.attackSpeed)
-                print('new health checkpoint:',self.healthCheckpoint)
+                # print('changed attack speed, now', self.attackSpeed)
+                # print('new health checkpoint:',self.healthCheckpoint)
         
         # phase 2 attacks and behaviors
         elif((self.phase == 2)):
@@ -539,7 +528,7 @@ class InsidiousCreature(Enemy):
             self.boundingBoxSetRadius = 1000
             if(app.boundingBox == None):
                 # also initializing attack speed
-                self.attackSpeed = 30
+                self.attackSpeed = 45
                 app.boundingBox = CircBoundingBox(self.xPosition, self.yPosition, self.xOffset, self.yOffset, (self.boundingBoxSetRadius * 5), 5)
             else:
                 # sychorize x and y offsets between bounding box and boss
@@ -553,15 +542,15 @@ class InsidiousCreature(Enemy):
                 # when the boss started to charge
                 if(self.subphase == 'chase'):
                     app.boundingBox.align(self.xPosition,self.yPosition,self.playerRadius)
-            # handling lazer attack
+            # handling laser attack
             if(self.subphase == 'chase'):
                 if((self.attackCounter % self.attackSpeed) == 0):
-                    self.fireLazer(app)
+                    self.fireLaser(app)
                     self.attackCounter = 0
                 self.attackCounter += 1
             # initalizing charge
             if((self.subphaseCounter % self.chargeSpeed) == 0):
-                print('charging!')
+                # print('charging!')
                 self.subphase = 'startCharge'
                 self.subphaseCounter = 1
                 self.attackCounter = 1
@@ -609,26 +598,27 @@ class InsidiousCreature(Enemy):
                 # charging, since I want the bounding box to stay where it was 
                 # when the boss started to charge
                 app.boundingBox.align(self.xPosition,self.yPosition,self.playerRadius)
-            # handling attack
+            # handling big tooth attack
             if((self.attackCounter % self.attackSpeed) == 0):
                 self.fireBigTooth(app,self.attackAngle)
                 self.attackCounter = 0
-                self.attackAngle += 10
+                self.attackAngle += 11
             self.attackCounter += 1
 
-        # updating active lazers
-        lazerDeleteSet = set()
-        for lazer in self.activeLazers:
-            self.activeLazers[lazer].update(self,app)
-            if(self.activeLazers[lazer].deleteMe):
-                lazerDeleteSet.add(lazer)
-        for lazer in lazerDeleteSet:
-            if(lazer in self.multiples['lazer'].activeInstances):
-                self.multiples['lazer'].activeInstances.remove(lazer)
-                del self.activeLazers[lazer]
+        # updating active lasers
+        laserDeleteSet = set()
+        for laser in self.activeLasers:
+            self.activeLasers[laser].update(self,app)
+            if(self.activeLasers[laser].deleteMe):
+                laserDeleteSet.add(laser)
+        for laser in laserDeleteSet:
+            if(laser in self.multiples['laser'].activeInstances):
+                self.multiples['laser'].activeInstances.remove(laser)
+                del self.activeLasers[laser]
 
     def fireTooth(self,app):
         # print('firing!')
+        # checking for available tooth names
         self.multiples['tooth'].currentValue = None
         for projectile in self.multiples['tooth'].checkSet:
             if(projectile not in self.multiples['tooth'].activeInstances):
@@ -636,12 +626,15 @@ class InsidiousCreature(Enemy):
                 break
         if(self.multiples['tooth'].currentValue == None):
             return
+        
         # print('current tooth:',self.multiples['tooth'].currentValue)
+        
         # setting up initial position and target position
         initialX = self.xPosition + self.xOffset
         initialY = self.yPosition + self.yOffset
         targetX = app.playerObject.centerX
         targetY = app.playerObject.centerY
+        
         # factoring in overshoot, to make the projectile follow through more
         overshoot = 100
         dx = targetX - initialX
@@ -653,8 +646,7 @@ class InsidiousCreature(Enemy):
             rotationAngle = math.radians(180) + (math.asin((dy)/distance))
         else:
             rotationAngle = (math.asin((-dy)/distance))
-
-        # adding in aim offset, to give projectiles a bit of variation
+        # also adding in aim offset, to give projectiles a bit of variation
         aimOffset = 15
         rotationAngle += math.radians(random.randint(-aimOffset, aimOffset))
         targetX -= math.cos(rotationAngle) * overshoot
@@ -665,16 +657,21 @@ class InsidiousCreature(Enemy):
         # ptc('targetX',targetX)
         # ptc('targetY',targetY)
 
-        app.projectile[self.multiples['tooth'].currentValue] = Linear(self.multiples['tooth'].currentValue,0,250,250,0.5,10,0,initialX,initialY,targetX,targetY,False)
+        # initiating projectile
+        app.projectile[self.multiples['tooth'].currentValue] = Linear(self.multiples['tooth'].currentValue,0,250,250,0.5,10,0,initialX,(initialY-self.yOffset),targetX,(targetY-self.yOffset),False)
         app.projectile[self.multiples['tooth'].currentValue].displayAngle = rotationAngle
         app.projectile[self.multiples['tooth'].currentValue].imagePath = self.multiples['tooth'].imagePath
         # print('added projectile:',self.multiples[projectileName].currentValue,'to active map projectiles')
         app.activeMapProjectiles.append(self.multiples['tooth'].currentValue)
         initiateProjectile(app,self.multiples['tooth'].currentValue)
+
+        # adding current tooth value to list of active tooth values
         self.multiples['tooth'].activeInstances.add(self.multiples['tooth'].currentValue)        
 
     def fireBigTooth(self,app,angle):
         # print('firing big tooth!')
+        
+        # checking for available big teeth names
         self.multiples['bigTooth'].currentValue = None
         for projectile in self.multiples['bigTooth'].checkSet:
             if(projectile not in self.multiples['bigTooth'].activeInstances):
@@ -683,9 +680,10 @@ class InsidiousCreature(Enemy):
         if(self.multiples['bigTooth'].currentValue == None):
             return
         # print('current tooth:',self.multiples['bigTooth'].currentValue)
+        
         # setting up initial position and target position
-        initialX = self.xPosition + self.xOffset + (math.cos(math.radians(angle)) * self.boundingBoxSetRadius * (0.5))
-        initialY = self.yPosition + self.yOffset + (math.sin(math.radians(angle)) * self.boundingBoxSetRadius * (0.5))
+        initialX = self.xPosition + self.xOffset
+        initialY = self.yPosition + self.yOffset
         targetX = initialX + (math.cos(math.radians(angle)) * self.boundingBoxSetRadius)
         targetY = initialY + (math.sin(math.radians(angle)) * self.boundingBoxSetRadius)
         initialX += (math.cos(math.radians(angle)) * self.boundingBoxSetRadius * (0.5))
@@ -695,37 +693,82 @@ class InsidiousCreature(Enemy):
         # ptc('initialY',initialY)
         # ptc('targetX',targetX)
         # ptc('targetY',targetY)
-
-        app.projectile[self.multiples['bigTooth'].currentValue] = Linear(self.multiples['bigTooth'].currentValue,0,750,250,1,10,0,initialX,initialY,targetX,targetY,False)
-        app.projectile[self.multiples['bigTooth'].currentValue].displayAngle = angle
-        app.projectile[self.multiples['bigTooth'].currentValue].ignoreScreenBounds = True
-        app.projectile[self.multiples['bigTooth'].currentValue].imagePath = self.multiples['bigTooth'].imagePath
-        # print('added projectile:',self.multiples[projectileName].currentValue,'to active map projectiles')
+        
+        # setting name
+        name = self.multiples['bigTooth'].currentValue
+        
+        # initiating projectile
         app.activeMapProjectiles.append(self.multiples['bigTooth'].currentValue)
-        initiateProjectile(app,self.multiples['bigTooth'].currentValue)
+        # print('tooth name:',name)
+        # print('x:',initialX)
+        # print('y:',initialY)
+        # print('y offset:',self.yOffset)
+        app.projectile[name] = Linear(self.multiples['bigTooth'].currentValue,0,750,250,1,10,0,initialX,(initialY-self.yOffset),targetX,(targetY-self.yOffset),False)
+        app.projectile[name].displayAngle = angle
+        app.projectile[name].ignoreScreenBounds = True
+        app.projectile[name].imagePath = self.multiples['bigTooth'].imagePath
+        # print('added projectile:',self.multiples[projectileName].currentValue,'to active map projectiles')
+        app.projectile[name].directionalAcceleration = 10
+        app.projectile[name].maxVelocity = 100
+        app.projectile[name].damage = 25
+        app.projectile[name].initialYOffset = app.ti['ground'].yOffset
+        app.projectile[name].yOffset = app.ti['ground'].yOffset
+        # setting up adjustment data for hitbox
+        xAdjustment = int(app.projectile[name].displayWidth * 0)
+        yAdjustment = int(app.projectile[name].displayHeight * 0.5)
+        # print('initiated AngledRect')
+        
+        # initiating hitbox
+        # print(associatedObject.initialYOffset)
+        # print(centerX, centerY)
+        width = app.projectile[name].displayWidth - xAdjustment
+        height = int(app.projectile[name].displayHeight) - yAdjustment
+        dx = targetX - initialX
+        dy = targetY - initialY
+        rotationAngle = getAngle(dx, dy, 'degrees')
+        # ptc('rotationAngle',rotationAngle)
+        [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(initialX, (initialY-self.yOffset), width, height, rotationAngle)
+        app.hitbox[name] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4,app.projectile[name])
+        h = app.hitbox[name]
+        h.belongsTo = 'enemy'
+        # print('coordinates:',p.x_1,p.y_1,p.x_2,p.y_2,p.x_3,p.y_3,p.x_4,p.y_4)
+        
+        # adding current big tooth name to list of active big tooth names
         self.multiples['bigTooth'].activeInstances.add(self.multiples['bigTooth'].currentValue)    
 
-    def fireLazer(self,app):
-        self.multiples['lazer'].currentValue = None
-        for projectile in self.multiples['lazer'].checkSet:
-            if(projectile not in self.multiples['lazer'].activeInstances):
-                self.multiples['lazer'].currentValue = projectile
+    def fireLaser(self,app):
+        # checking for avilable laser names
+        self.multiples['laser'].currentValue = None
+        for projectile in self.multiples['laser'].checkSet:
+            if(projectile not in self.multiples['laser'].activeInstances):
+                self.multiples['laser'].currentValue = projectile
                 break
-        if(self.multiples['lazer'].currentValue == None):
+        if(self.multiples['laser'].currentValue == None):
             return
-        self.multiples['lazer'].activeInstances.add(self.multiples['lazer'].currentValue)
-        self.activeLazers[self.multiples['lazer'].currentValue] = (InsidiousCreatureLazer(app,self.multiples['lazer'].currentValue,self.xOffset,self.yOffset))
+        
+        # adding laser name to list of active laser names
+        self.multiples['laser'].activeInstances.add(self.multiples['laser'].currentValue)
+        
+        # initiating laser
+        self.activeLasers[self.multiples['laser'].currentValue] = (InsidiousCreatureLaser(app,self.multiples['laser'].currentValue,self.xOffset,self.yOffset))
 
     def updateImage(self,app):
+        # setting initial image
         if(self.phase == 0):
             self.imagePath = 'images/insidiousCreature/eyesClosed.png'
+        
+        # setting phase 1 image
         elif(self.phase == 1):
             self.imagePath = 'images/insidiousCreature/eyesOpen.png'
+        
+        # setting phase 2 and phase 2 transition images
         elif(self.phase == 2):
             if(self.subphase == 'phaseChange_2'):
                 self.imagePath = 'images/insidiousCreature/eyesOpen.png'
             else:
                 self.imagePath = 'images/insidiousCreature/phase_2.png'
+        
+        # setting phase 3 and phase 3 transition images
         elif(self.phase == 3):
             if(self.subphase == 'phaseChange_3'):
                 self.imagePath = 'images/insidiousCreature/phase_2.png'
@@ -733,7 +776,9 @@ class InsidiousCreature(Enemy):
                 self.imagePath = 'images/insidiousCreature/phase_3.png'
                 
     def spawnPickups(self,pickupType,quantity,restorationAmmount,app):
+        # looping over number of pickups
         for i in range(quantity):
+            # checking for avilable pickup names
             self.multiples[pickupType].currentValue = None
             for pickup in self.multiples[pickupType].checkSet:
                 if(pickup not in self.multiples[pickupType].activeInstances):
@@ -741,13 +786,19 @@ class InsidiousCreature(Enemy):
                     break
             if(self.multiples[pickupType].currentValue == None):
                 return
+            
+            # setting rotation and initial position
             rotationAngle = math.radians(random.randint(0,360))
             initialX = self.xPosition + self.xOffset + (math.cos(rotationAngle) * self.pickupSpawnRadius)
             initialY = self.yPosition + (math.sin(rotationAngle) * self.pickupSpawnRadius)
             # ptc('initialX',initialX)
             # ptc('initialY',initialY)
             # print(self.multiples[pickupType].currentValue)
+            
+            # initiating pickup
             app.pickups[self.multiples[pickupType].currentValue] = Pickup(app,pickupType,self.multiples[pickupType].currentValue,restorationAmmount,self.multiples[pickupType].imagePath,50,50,1,0,initialX,initialY,0,self.yOffset,100,'center')
+            
+            # adding pickup name to list of active pickup names
             self.multiples[pickupType].activeInstances.add(self.multiples[pickupType].currentValue)
 
     def updateState(self,app):
@@ -761,53 +812,65 @@ class InsidiousCreature(Enemy):
             self.healthCheckpoint = self.maxHealth - 60
             self.invulnerable = True
         
+        # run attack coordinator
+        self.attackCoordinator(app)
+        
         # deactivate boss if dead
         if(self.health == 0):
-            print('died')
-            app.playerHealth == 100
+            app.boundingBox = None
+            # death animation and effects
+            app.lightSources.append(LightSource(10,255,((self.xPosition + self.xOffset)/app.lightmapScalingFactor),((self.yPosition + self.yOffset)/app.lightmapScalingFactor),0.95))
+            frameList = [f'images/explosion/explosion_{i}.gif' for i in range(17)]
+            app.simpleAnimations.append(SimpleAnimation(app,frameList,3,True,700,1000,0,'center',(self.xPosition + self.xOffset),(self.yPosition),True,0))
+            app.playerHealth = 100
+            app.gameState = 'winCutscene'
             self.deleteMe = True
-        self.attackCoordinator(app)
         
         # switching phase
         if(self.health <= self.phaseCheckpoint):
             app.boundingBox = None
             self.phase += 1
-            self.phaseCheckpoint = max((self.phaseCheckpoint - 700), 0)
+            self.phaseCheckpoint = max((self.phaseCheckpoint - 700), -1)
             self.subphase = f'phaseChange_{self.phase}'
-            print('new Phase!', self.phase)
-            print('new phase checkpoint:', self.phaseCheckpoint)
+            # print('new Phase!', self.phase)
+            # print('new phase checkpoint:', self.phaseCheckpoint)
             framelist = [f'images/insidiousCreature/phaseChangeCloud_{i}.png' for i in range(15)]
             x = self.xPosition + self.xOffset
             y = self.yPosition
             self.subphaseCounter = 0
             self.invulnerable = True
+            # phase 2 transition animation and effects
             if(self.phase == 2):
-                app.lightSources.append(LightSource(20,255,x,y,0.95))
+                app.lightSources.append(LightSource(10,255,(x/app.lightmapScalingFactor),(y/app.lightmapScalingFactor),0.95))
                 app.simpleAnimations.append(SimpleAnimation(app,framelist,3,True,750,750,0,'center',x,y,True,0.1))
                 self.spawnPickups('manaPickup',3,10,app)
                 self.spawnPickups('healthPickup',3,20,app)
             elif(self.phase == 3):
+                # phase 3 transition animation and effects
                 self.displayAngle = 0
                 for i in range(5):
                     app.simpleAnimations.append(SimpleAnimation(app,framelist,3,True,750,750,0,'center',x,y,True,0.1))
-                app.lightSources.append(LightSource(20,255,x,y,0.95))
+                app.lightSources.append(LightSource(10,255,(x/app.lightmapScalingFactor),(y/app.lightmapScalingFactor),0.95))
                 self.spawnPickups('manaPickup',5,15,app)
                 self.spawnPickups('healthPickup',5,25,app)
         
         # helping with subphase management and phase cutscenes
         if(self.phase != 0):
             self.subphaseCounter += 1
+            # transition from phase 1 - 2
             if((self.subphase == 'phaseChange_2') and self.subphaseCounter >= 40):
                 self.invulnerable = False
                 self.subphase = 'chase'
-                self.playerDamageOnHit = 35
+                self.playerDamageOnHit = 30
+            # transition from phase 2 - 3
             if((self.subphase == 'phaseChange_3') and self.subphaseCounter >= 40):
                 self.invulnerable = False
                 self.playerDamageOnHit = 20
 
-    def drawLazers(self):
-        for lazer in self.activeLazers:
-            self.activeLazers[lazer].draw()
+    def drawLasers(self):
+        # looping through active lasers and drawing their guide projectiles
+        for laser in self.activeLasers:
+            self.activeLasers[laser].draw()
 
     def __hash__(self):
         return hash(str(self))
@@ -815,6 +878,7 @@ class InsidiousCreature(Enemy):
     def __eq__(self,other):
         return ((isinstance(other,InsidiousCreature)) and (self.name == other.name))
 
+# test boss
 class TheHideousBeast(Enemy):
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit):
         super().__init__(name,frames,imageWidth,imageHeight,imageScale,alignment,drawBuffer,displayAngle,initialX,initialY,maxHealth,playerDamageOnHit)
@@ -823,7 +887,6 @@ class TheHideousBeast(Enemy):
         self.modeTimer = 0
 
     def move(self,app):
-        
         self.xDistanceFromPlayer = ((app.screenWidth // 2) - self.xPosition) - self.xOffset
         if(self.behavioralMode == 'chase'):
             approachThreshold = 500
@@ -1081,7 +1144,7 @@ class HitboxRect(Hitbox):
         self.yOffset = int(other.yOffset)
 
 class HitboxAngledRect(Hitbox):
-    def __init__(self,x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4):
+    def __init__(self,x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4,asscociatedObject):
         super().__init__()
         self.x_1 = x_1
         self.y_1 = y_1
@@ -1091,6 +1154,8 @@ class HitboxAngledRect(Hitbox):
         self.y_3 = y_3
         self.x_4 = x_4
         self.y_4 = y_4
+        self.associatedObject = asscociatedObject
+        self.align(self.associatedObject)
 
     def align(self,other):
         if(isinstance(other,Projectile)):
@@ -1113,22 +1178,11 @@ class HitboxAngledRect(Hitbox):
 
     def __eq__(self,other):
         selfList = [self.x_1,self.y_1,self.x_2,self.y_2,self.x_3,self.y_3,self.x_4,self.y_4]
-        otherList = [other.x_1,other.y_1,other.x_2,other.y_2,other.x_3,other.y_3,other.x_4,other.y]
+        otherList = [other.x_1,other.y_1,other.x_2,other.y_2,other.x_3,other.y_3,other.x_4,other.y_4]
         return (isinstance(other,HitboxAngledRect)) and ([int(i) for i in selfList] == [int(i) for i in otherList])
 
 # DEBUG/TESTING FUNCTIONS
-# temporary transparency test function
-def transparencyTest(app):
-    # transparencyTestImagePath = 'images/transparenceyTest.png'
-    transparencyTestImagePath = 'images/transparenceyTest2.png'
-    transparencyTestImage_1 = Image.open(transparencyTestImagePath)
-    transparencyTestImage = CMUImage(transparencyTestImage_1)
-    x = app.screenWidth//2
-    y = app.screenHeight//2
-    size = 500
-    drawImage(transparencyTestImage,x,y,width=size,height=size,align='center')
-
-# temporary function for displaying the defensive spell sectors (used especially for the shield spell)
+# debug function for displaying the defensive spell sectors (used especially for the shield spell)
 def displaySectors(app):
     sectorOpacity = 50
 
@@ -1159,26 +1213,80 @@ def displaySectors(app):
         y_2 = y_0 + (hypotenuse * math.sin(math.radians(sectorAngle_2)))
         drawPolygon(x_0,y_0,x_1,y_1,x_2,y_2,fill=sectorColors[sector],opacity=sectorOpacity)
 
-# temporary function for display anticipated shield positions
+# debug function for display anticipated shield positions
 def displayShieldPositions(app):
     for direction in app.shieldData:
         x = app.shieldData[direction][0]
         y = app.shieldData[direction][1]
         drawCircle(x,y,10,fill='red')
 
-# temporary function for debugging, displays the values of certain variables
-def tempDisplayReadout(app,inputList):
+# debug function for debugging, displays the values of certain variables
+def displayReadout(app,inputList):
     buffer = 10
     lineSpacing = 20
     lineXPosition = 0 + buffer
     lineYPosition = app.screenHeight - buffer
     for i in range(0,len(inputList),2):
         displayText = f'{inputList[i]}: {inputList[i+1]}'
-        drawLabel(displayText, lineXPosition, lineYPosition, 
+        drawLabel(displayText, 
+        lineXPosition, lineYPosition, 
               fill = 'white', border = "black", borderWidth = 1, opacity = 100, 
               rotateAngle = 0, align = 'left-bottom', visible = True, size = 20, 
               font = 'arial', bold = True, italic = False)
         lineYPosition -= lineSpacing
+
+def displayDebugFeatures(app):
+    debugTextBuffer = 10
+    debugTextHeight = 20
+    debugTextRight = (app.screenWidth - debugTextBuffer)
+    debugTextBottom = (app.screenHeight - debugTextBuffer) - (debugTextHeight * (len(app.debugFeatureDisplayText) - 1))
+    for debugText in app.debugFeatureDisplayText:
+        drawLabel(debugText,debugTextRight,debugTextBottom,fill='white',align='right-bottom')
+        debugTextBottom += debugTextHeight
+
+    if(app.displayScreenZones):
+        displaySectors(app)
+    if(app.displayShieldPositions):
+        displayShieldPositions(app)
+    if(app.displayReadout):
+        displayReadout(app,['currentPlayerXAcceleration',
+                                app.player['x'].currentAcceleration,
+                                'currentPlayerXVelocity',
+                                app.player['x'].currentVelocity, 
+                                'currentPlayerXThrust',
+                                app.player['x'].currentThrust, 
+                                'previousPlayerXVelocity',
+                                app.player['x'].previousVelocity,
+                                'playerXFrictionConstant',
+                                app.player['x'].frictionConstant,
+                                'currentPlayerXFrictionForce',
+                                app.player['x'].currentFrictionForce,
+                                'currentMaxPlayerXVelocity',
+                                app.player['x'].currentMaxVelocity,
+                                'current X gravity',
+                                app.player['x'].gravity,
+                                'currentPlayerYAcceleration',
+                                app.player['y'].currentAcceleration,
+                                'currentPlayerYVelocity',
+                                app.player['y'].currentVelocity, 
+                                'currentPlayerYThrust',
+                                app.player['y'].currentThrust, 
+                                'previousPlayerYVelocity',
+                                app.player['y'].previousVelocity,
+                                'playerYFrictionConstant',
+                                app.player['y'].frictionConstant,
+                                'currentPlayerYFrictionForce',
+                                app.player['y'].currentFrictionForce,
+                                'currentMaxPlayerYVelocity',
+                                app.player['y'].currentMaxVelocity,
+                                'current Y gravity',
+                                app.player['y'].gravity,
+                                'current ground YOffset',
+                                app.ti['ground'].yOffset,
+                                'playerWingCounter',
+                                app.playerWingCounter,
+                                'current player state',
+                                app.playerState])   
 
 # GENERAL HELPER FUNCTIONS
 # function to get justified angle based off of dx and dy
@@ -1197,6 +1305,7 @@ def getAngle(dx,dy,outputType):
         else: 
             return math.asin((-dy)/distance)
 
+# function to check polygon intersection, used for angled rectanlgle collisions
 def checkConvexPolygonIntersection(vertexList_1,vertexList_2):
     # Polygon intersection referenced from https://www.gorillasun.de/blog/an-algorithm-for-polygon-intersections/
     # and implementation guided by Professor Mike Taylor and TA Nathan Xie
@@ -1249,6 +1358,8 @@ def checkConvexPolygonIntersection(vertexList_1,vertexList_2):
             return insideRect
     return False
 
+# function to mathemtically apply a rotation to a given rectangle. This 
+# outputs four verticies rotated around the rectangle's center
 def applyRectangleRotation(centerX,centerY,width,height,rotationAngle):
     radAngle = math.radians(rotationAngle)
     # settign up coordinates
@@ -1312,11 +1423,7 @@ def reportError(process, errorName, function, faultType, fault,
     # making the program crash after error is found, avoiding logical errors
     sys.exit()  
 
-# 2D list makign helper function using list comphrehension
-# referenced from https://academy.cs.cmu.edu/notes/9011
-def make2DList(rows,cols,fillData):
-    return  [ [fillData] * cols for row in range(rows)]
-
+# reports which screen sector the mouse is currently in
 def getMouseScreenSector(app,mouseX,mouseY):
     x_0 = app.playerObject.centerX
     y_0 = app.playerObject.centerY
@@ -1344,6 +1451,7 @@ def getMouseScreenSector(app,mouseX,mouseY):
     app.mouseScreenSector = currentScreenSector
 
 # GENERAL PHYSICS FUNCTIONS
+# updating the positioning of various objects based off of player velocity
 def updatePositioning(app):
     # update tileable image positioning
     for tileableImageName in app.tileableImageList:
@@ -1371,6 +1479,7 @@ def updatePositioning(app):
     for projectileName in app.activeMapProjectiles:
         app.projectile[projectileName].xOffset -= (app.player['x'].currentVelocity)
         app.projectile[projectileName].yOffset = app.ti['ground'].yOffset
+        # print(projectileName)
 
     # update enemy positioning
     for enemyName in app.enemies:
@@ -1391,6 +1500,7 @@ def updatePositioning(app):
     # update total X Offset (for out of bounds effects)
     app.totalXOffset -= app.player['x'].currentVelocity
 
+# full-complexity physics calculations, utilized mainly by player and bosses
 def runPhysicsCalculations(subject):
     subject.currentAcceleration = (((subject.currentThrust)+(subject.gravity)+((subject.frictionConstant)*(subject.previousVelocity)))/((subject.mass)-(subject.frictionConstant)))
     subject.currentVelocity = ((subject.currentAcceleration)+(subject.previousVelocity))
@@ -1398,11 +1508,33 @@ def runPhysicsCalculations(subject):
     subject.currentMaxVelocity = (((subject.currentThrust)*(1-((subject.mass)/(subject.frictionConstant))))/((subject.mass)-(subject.frictionConstant)))
     subject.previousVelocity = subject.currentVelocity
 
+# simpler version of the physics calculations, for improved speed
 def simplePhysicsCalculations(subject,netForce):
     subject.currentAcceleration = netForce / subject.mass
     subject.currentVelocity += subject.currentAcceleration
 
 # PLAYER PHYSICS & ANIMATIONS
+# overview of my player animation pipeline:
+# The state of the player, whether that be characterized by velocity, altitude,
+# key presses, must be interpreted into the appropriate image to be displayed 
+# to represent that state. 
+# If the player's velocity is zero, they must be standing still, and thus the 
+# image for standing must be shown. 
+# If the player is flying then the flying animation must be played, etc...
+# my way of doing so works as such:
+# Player state is interpreted into a list of three values which I call an 
+# image index. There exists a seperate image index for the player and for the
+# player's wings. The encoding scheme of the player image index is described in
+# function interpretPlayerImageIndex, and the encoding scheme of the wing
+# image index is described in the function interpretPlayerWingImageIndex.
+# The function interpretPlayerState is what is actually responsible for 
+# determining the three values of the index depending on the player's state.
+# This index is then constructed into a usable image path in the 
+# function updatePlayerImage2, and the image is finally displayed in
+# the function drawPlayer. 
+
+# turns wing index data into usable strings, that will then be constructed
+# into the appropriate wing image's path
 def interpretPlayerWingImageIndex(app,indexToInterpret):
 
     # PLAYER WING IMAGE ENCODING KEY
@@ -1469,6 +1601,8 @@ def interpretPlayerWingImageIndex(app,indexToInterpret):
                         'app.playerWingImageIndex has no index', 
                         f'[{indexToInterpret}]', None)
 
+# turns player index data into usable strings, that will then be constructed
+# into the appropriate player image's path
 def interpretPlayerImageIndex(app,indexToInterpret):
 
     # PLAYER IMAGE ENCODING KEY
@@ -1530,13 +1664,15 @@ def interpretPlayerImageIndex(app,indexToInterpret):
                         'app.playerImageIndex has no index', 
                         f'[{indexToInterpret}]', None)
 
+# small helper function to check the player's y offset and return applicable
+# altitude
 def playerAnimationAltitudeCheck(app):
     if(app.ti['ground'].yOffset > app.currentPlayerGroundYOffset):
         return 'air'
     else: 
         return 'ground'
 
-# little helper function to set player wing offset at different states
+# small helper function to set player wing offset at different states
 def setPlayerWingOffset(app,x,y):
     if(app.playerFacing == 'right'):
         app.playerWingXOffset = x
@@ -1545,6 +1681,8 @@ def setPlayerWingOffset(app,x,y):
         app.playerWingXOffset = -x
         app.playerWingYOffset = y
 
+# interperts current game behaviors and player state to set the apropriate
+# image index values.
 def interpretPlayerState(app):
         # 'Locking' animations, which are those for which the direction cannot
         # be immediately changed by pressing the arrow keys, take priority
@@ -1760,6 +1898,7 @@ def interpretPlayerState(app):
         # these values are tuned manually
         setPlayerWingOffset(app,16,18)
 
+# updates player image and constructs the image
 def updatePlayerImage2(app):
     # ---- FROM MK1 (Spritesheet) ----
     # ok it's 4:00 AM and I going to bed but here's the problem I have yet
@@ -1816,7 +1955,7 @@ def updatePlayerImage2(app):
     app.playerWingY =  int((app.screenHeight-app.playerObject.displayHeight)/2) - app.playerWingYOffset
 
         
-    #s etting Player Image Path
+    # setting Player Image Path
     playerImageName = (f'{playerFacing}{playerMotion}{playerAnimationFrame}')
     testPlayerImagePath = (f'images/player/{playerImageName}.png')
 
@@ -1831,6 +1970,8 @@ def updatePlayerImage2(app):
         reportError('accessing desired player image file', 
                     'IMAGE COULD NOT BE FOUND', 'UpdatePlayerImage2', 
                     'File name', (f'images/{playerImageName}.png'), None)
+    
+    # assigning wing image path and returning an error if it is invalid
     if os.path.exists(testPlayerWingImagePath):
         app.playerWingImage = (f'images/player/{playerWingImageName}.png')
     else:
@@ -1838,6 +1979,7 @@ def updatePlayerImage2(app):
                     'IMAGE COULD NOT BE FOUND', 'UpdatePlayerImage2', 
                     'File name', (f'images/{playerWingImageName}.png'), None)
 
+# draws the player
 def drawPlayer(app):
     # if player is running right specifically we want to display the wings 
     # OVER the player image. Under no other condition is this visibly neseccary
@@ -1848,6 +1990,7 @@ def drawPlayer(app):
         drawImage(app.playerWingImage, (app.playerWingX + app.screenShakeX), (app.playerWingY + app.screenShakeY), width = app.playerWingWidth, height = app.playerWingHeight)
         drawImage(app.playerImage, (app.playerObject.xPosition + app.screenShakeX), (app.playerObject.yPosition + app.screenShakeY), width = app.playerObject.displayWidth, height = app.playerObject.displayHeight)
 
+# runs the main player physics simulations for the game
 def updatePlayerVelocity(app):
 
     # handling X velocity
@@ -1896,6 +2039,8 @@ def updatePlayerVelocity(app):
     updatePositioning(app)
     
 # TILEABLE IMAGES
+# updates tileable image positions, and is responsible for the tiling affect
+# and tile reordering procedure
 def updateTiles(app,tileableImageName):
     # retrieving variable values
     tileWidth = app.ti[tileableImageName].tileWidth
@@ -1903,7 +2048,6 @@ def updateTiles(app,tileableImageName):
     yOffset = app.ti[tileableImageName].yOffset
     parallaxCoefficient = app.ti[tileableImageName].parallaxCoefficient
     tileableImageWidth = app.ti[tileableImageName].imageWidth
-    tileableImageHeight = app.ti[tileableImageName].imageHeight 
     cols = app.ti[tileableImageName].numberOfCols
     initialColsList = app.ti[tileableImageName].initialColsList
 
@@ -1938,13 +2082,13 @@ def updateTiles(app,tileableImageName):
     app.ti[tileableImageName].currentTileYPosition = ((app.ti[tileableImageName].initialTileYPosition)+yOffsetParallax)
     app.ti[tileableImageName].xOffset = (xOffsetParallax * parallaxCoefficient)
 
+# draws the tiles to the screen, but only if they are within bounds
 def drawTiles(app,tileableImageName):
     tileWidth = app.ti[tileableImageName].tileWidth
     currentColsList = app.ti[tileableImageName].currentColsList
     currentTileXPosition = app.ti[tileableImageName].currentTileXPosition
     currentTileYPosition = app.ti[tileableImageName].currentTileYPosition
     currentTileBottom = app.ti[tileableImageName].currentTileYPosition + app.ti[tileableImageName].imageHeight
-    
     
     for row in currentColsList:
         # only draw tiles if they are within the bounds of the screen
@@ -1961,6 +2105,8 @@ def drawTiles(app,tileableImageName):
                                 'File name', (tileableImageSavePath), None)
         currentTileXPosition += tileWidth
 
+# takes the tileable images and cuts them up into tiles using PIL image cropping
+# this only happens at the very beginning, and as such is an ok method to use
 def tileImage(app,tileableImage,tileWidth,tileableImageName):
     # TILEABLE IMAGE NAME SHOULD BE THE SAME NAME AS THE FOLDER THAT CONTAINS IT
     tileableImageWidth, tileableImageHeight = getImageSize(tileableImage)
@@ -2002,6 +2148,7 @@ def tileImage(app,tileableImage,tileWidth,tileableImageName):
     app.ti[tileableImageName].initialColsList = colsList 
 
 # LIGHTING
+# sets up lightmap positioning, scaling, and opacity matrix 
 def lightmapSetup(app):
     app.lightmapScalingFactor = 50
     app.lightmapBuffer = 100
@@ -2017,7 +2164,7 @@ def lightmapSetup(app):
 def calculateLightmapGaussian(x,y,lightSources,opacityOffset):
     lightsourceMaxIntensity = 255
     opacity = 255
-    # arbitrady adjusted value for calculation distance cutoff
+    # arbitray adjusted value for calculation distance cutoff
     # it is unnessecary to calculate the effects of a light source on a point
     # if that light source is definitely too far away to have an effect
     # having a distance cutoff saves computation time
@@ -2027,12 +2174,16 @@ def calculateLightmapGaussian(x,y,lightSources,opacityOffset):
             opacity -= int((lightSource.intensity)*((lightsourceMaxIntensity)**((-1*(((x-lightSource.x)**2)/(2*((lightSource.spread)**2))))-(((y-lightSource.y )**2)/(2*((lightSource.spread)**2))))))
     return [0,min(max((opacity+opacityOffset),0),255)]
 
+# specifically determines when and under which conditions the lightmap should
+# update, to ensure that it only updates when absolutely nessceary, as 
+# the PIL image from array method is extremely slow. 
 def updateLightmap(app,groundCheck):
     # these if statements aren't techanically nessecary but it much better 
     # helps me see the conditions under which the lightmap should update
     updateLightmap = False
     if(len(app.lightSources) > 0):
         for lightSource in app.lightSources:
+            # making sure the light source we want to display is within bounds
             if(((((0-(app.lightmapBuffer*lightSource.spread))/app.lightmapScalingFactor)) <= lightSource.x <= (int((app.screenWidth+(app.lightmapBuffer*lightSource.spread))/app.lightmapScalingFactor))) and (((0-(app.lightmapBuffer*lightSource.spread))/app.lightmapScalingFactor) <= lightSource.y <= (int((app.screenHeight+(app.lightmapBuffer*lightSource.spread))/app.lightmapScalingFactor)))):
                 # print('inbounds')
                 # print('lightSource.x: ',lightSource.x)
@@ -2050,9 +2201,9 @@ def updateLightmap(app,groundCheck):
         # print('trigger 3')
         # ptc('app.lightmapYOffset',app.lightmapYOffset)    
 
-    # ptc('app.lightmapYOffset',app.lightmapYOffset)    
-
+    # actually updating the lightmap
     if(updateLightmap and (app.lightmapUpdateCounter % app.lightmapUpdateRate == 0)):
+        # print('updating lightmap!')
         for y in range(app.lightmapMatrixY):
             app.lightmapYOffset = app.ti['ground'].yOffset
             groundY = app.ti['ground'].yOffset+app.ti['ground'].initialTileYPosition
@@ -2064,13 +2215,18 @@ def updateLightmap(app,groundCheck):
                 floorLightPermeabilityConstant = 10
                 opacityOffset = -app.backgroundBrightness + y*floorLightPermeabilityConstant
                 # print(opacityOffset)
+            # using our gaussian helper function to construct the opacity matrix
             for x in range(app.lightmapMatrixX):
                 app.lightmapOpacityMatrix[y,x] = calculateLightmapGaussian(x,y,app.lightSources,opacityOffset)
+        # turning the opacity matrix into a displayable image
         lightmap = Image.fromarray(app.lightmapOpacityMatrix, mode = 'LA')
+        # saving that image
         app.lightmapImage = CMUImage(lightmap)
     app.lightmapUpdateCounter += 1
     # ptc('app.lightmapUpdateCounter',app.lightmapUpdateCounter)
 
+# keeps track of active lightsources and updates them as they fade, then deletes
+# them when their intensity reaches 0
 def updateLightsources(app):
     i = 0
     while i < len(app.lightSources):
@@ -2081,12 +2237,12 @@ def updateLightsources(app):
             app.lightSources[i].intensity = int(math.floor((app.lightSources[i].intensity * app.lightSources[i].fadeRate)*100)/100)
             i+=1
 
+# draws the lightmap on the screen
 def drawLightmap(app):
     drawImage(app.lightmapImage,(app.lightmapXPosition+app.screenShakeX),(app.lightmapYPosition+app.screenShakeY),width = (app.lightmapMatrixX*app.lightmapScalingFactor),height = (app.lightmapMatrixY*app.lightmapScalingFactor),opacity=app.lightmapOpacity)
 
 # SPELL ORB
 def updateSpellOrb(app):
-
     # update image
     if(app.spellOrbCharged):
         app.spellOrbImage = 'images/spellOrbs/spellOrbCharged.png'
@@ -2182,6 +2338,8 @@ def chargeSpell(app,spellName):
 # enables the spell casting animation itself, and calculates the apropriate 
 # angle for the spell animation to cast
 def initiateSpellCast(app,spellName,targetX,targetY):
+    # checking to make sure we have a valid spell name by attempting to
+    # access the value associated with it, and returning an error otherwise
     try:
         app.spells[spellName].targetX = targetX
         app.spells[spellName].targetY = targetY
@@ -2196,8 +2354,9 @@ def initiateSpellCast(app,spellName,targetX,targetY):
     if((app.spellData[spellType].spellCastingEnabler) and (len(app.spellData[spellType].activeSpell) == 1)):
         return
     
-    # end effect spells
+    # initiating end effect spells
     if(app.spells[spellName].displayType == 'endEffect'):
+        # setting up position and angle
         distanceToTarget = getDistance(app.spellOrbXPosition,app.spellOrbYPosition,targetX,targetY)
         dx = (targetX - app.spellOrbXPosition)
         if(dx == 0):
@@ -2220,7 +2379,7 @@ def initiateSpellCast(app,spellName,targetX,targetY):
         # imageXYRatio = app.spells[spellName].imageHeight / app.spells[spellName].imageWidth
         app.spells[spellName].displayHeight = app.spells[spellName].imageHeight
     
-    # shield spell
+    # initiating shield spell
     elif(app.spells[spellName].displayType == 'shield'):
         # pick shield alignment depending on which sector of the screen the mouse is in
         # print(app.mouseScreenSector)
@@ -2231,7 +2390,7 @@ def initiateSpellCast(app,spellName,targetX,targetY):
         width = int(app.spells[spellName].displayWidth * 0.3)
         height = int(app.spells[spellName].displayHeight * 1)
         [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(app.spells[spellName].xPosition, app.spells[spellName].yPosition, width, height, hitboxRotationAngle)
-        app.hitbox[spellName] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4)
+        app.hitbox[spellName] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4,app.spells[spellName])
         h = app.hitbox[spellName]
         h.associatedObject = app.spells[spellName]
         h.belongsTo = 'player'
@@ -2258,7 +2417,7 @@ def initiateSpellCast(app,spellName,targetX,targetY):
         # create projectile instances using spell data
         # print('projectile Type:',app.spells[spellName].projectileType)
         if(app.spells[spellName].projectileType == 'linear'):
-            app.projectile[spellName] = Linear(spellName,frames,width,height,scale,drawBuffer,0,initialX,initialY,targetX,targetY,True)
+            app.projectile[spellName] = Linear(spellName,frames,width,height,scale,drawBuffer,0,initialX,(initialY-app.ti['ground'].yOffset),targetX,(targetY-app.ti['ground'].yOffset),True)
         elif(app.spells[spellName].projectileType == "pointHoming"):
             app.projectile[spellName] = PointHoming(spellName,frames,width,height,scale,drawBuffer,0,initialX,initialY,targetX,targetY,True)
         elif(app.spells[spellName].projectileType == "groundbounce"):
@@ -2278,7 +2437,7 @@ def initiateSpellCast(app,spellName,targetX,targetY):
                 app.projectile[spellName].xVelocity = -app.player['x'].currentVelocity
                 app.projectile[spellName].yVelocity = -app.player['y'].currentVelocity
    
-    # if no spell type has been recognized, throw an error
+    # if no spell type has been recognized, report an error
     else:
         reportError('initiating spell', 'INVALID SPELL DISPLAY TYPE', 
                     'intiateSpellCast', 'display type', 
@@ -2292,11 +2451,16 @@ def initiateSpellCast(app,spellName,targetX,targetY):
 # plays the spell animation, and removes the spell from app.activeAggressiveSpells when
 # the spell is finished, as well as calls activateSpellEffect ON THE LAST FRAME
 def castSpell(app,spellName):
+    # checking to make sure we have a valid spell name by attempting to
+    # access the value associated with it, and returning an error otherwise
     try:
         spellType = app.spells[spellName].spellType
     except:
         reportError('casting spell', 'INVALID SPELL', 'castSpell', 'spell name', (spellName), 'reference appStart to find valid spells')
+    
     # print('casting Spell')
+    
+    # casting end effect spells
     if(app.spells[spellName].displayType == 'endEffect'):
         spellDirection = app.mouseOrbSide[0].upper()+app.mouseOrbSide[1:]
         if(app.spells[spellName].animationCounter == (app.spells[spellName].animationFrames - 1)):
@@ -2307,6 +2471,8 @@ def castSpell(app,spellName):
             app.spellData[spellType].spellCastingEnabler = False
             app.spellData[spellType].activeSpell = []
             return
+    
+    # casting shield spell
     elif(app.spells[spellName].displayType == 'shield'):
         app.spells[spellName].animationCounter = 0
         spellDirection = app.mouseScreenSector
@@ -2317,13 +2483,18 @@ def castSpell(app,spellName):
             app.spellData[spellType].activeSpell = []
             del app.hitbox[spellName]
             app.removeShield = False
+    
+    # casting projectile type spells
     elif(app.spells[spellName].displayType in app.projectileTypeList):
+        # if the spell's associated projectile has already been deleted 
+        # (via hitbox collision), then just reset the remaining spell effects
         if((spellName not in app.activePlayerProjectiles) and (spellName not in app.activeMapProjectiles)):
             app.spells[spellName].animationCounter = 0
             app.spellData[spellType].drawingSpell = False
             app.spellData[spellType].spellCastingEnabler = False
             app.spellData[spellType].activeSpell = []
             return
+        # casting projectile spells
         else:
             app.spells[spellName].animationCounter %= app.spells[spellName].animationFrames
             if(app.spells[spellName].projectileType in {'linear','pointHoming','groundbounce'}):
@@ -2344,13 +2515,14 @@ def castSpell(app,spellName):
                     spellDirection = 'Left'
             else:
                 spellDirection = ''
-
-        # assigning spell as either an active map or player projectile
+    # returning an error if the spell display type was not recognized
     else:
         reportError('initiating spell', 'INVALID SPELL DISPLAY TYPE', 
                     'castSpell', 'display type', 
                     app.spells[spellName].displayType, None)
+        
     # print(spellDirection)
+    # setting the spell's current image path
     spellImagePath = f'images/spells/{spellName}{spellDirection}_{app.spells[spellName].animationCounter}.png'
     app.spellData[spellType].imagePath = spellImagePath
     if(app.spells[spellName].displayType in app.projectileTypeList):
@@ -2367,10 +2539,12 @@ def drawSpell(app,spellName):
         s = app.spells[spellName]
         drawImage(spellImagePath,(s.xPosition+app.screenShakeX),(s.yPosition+app.screenShakeY),width = s.displayWidth, height = s.displayHeight, align='center',rotateAngle = s.displayAngle, opacity = s.opacity)
 
-# actually plays the effect of the spell
+# actually plays the effect of the spell, should it have an associated effect
+# that needs to be handled as a spell specifically
 def activateSpellEffect(app,spellName):
     if(spellName == 'testLightSpell'):
         app.lightSources.append(LightSource(3,255,(app.spells[spellName].targetX/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),0.95))
+    
     elif(spellName == 'levelOneSlimeBall'):
         frameList = ['images/spells/levelOneSlimeBallEndAnimation_0.png','images/spells/levelOneSlimeBallEndAnimation_1.png','images/spells/levelOneSlimeBallEndAnimation_2.png']
         displayWidth = app.spells[spellName].displayWidth
@@ -2395,12 +2569,13 @@ def drawProjectile(app,projectileName):
 def updateProjectiles(app):
     # update active map projectiles
     for projectileName in app.activeMapProjectiles:
-        # print('current projectile handling:', projectileName)
+        # updating projectiles that did not originate from player spells
         if(not app.projectile[projectileName].isPlayerSpell):
             endCondition = app.projectile[projectileName].move()
             if(endCondition):
                 app.projectile[projectileName].deleteMe = True
 
+        # running projectile deletion procedure for map projectiles
         if(app.projectile[projectileName].deleteMe):
             if(app.projectile[projectileName].isPlayerSpell):
                 app.spells[projectileName].xPosition = app.projectile[projectileName].xPosition + app.projectile[projectileName].xOffset
@@ -2409,8 +2584,8 @@ def updateProjectiles(app):
                 activateSpellEffect(app,projectileName)
             elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['tooth'].checkSet)):
                 app.enemies['insidiousCreature'].multiples['tooth'].activeInstances.remove(projectileName)
-            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['lazer'].checkSet)):
-                app.enemies['insidiousCreature'].activeLazers[projectileName].deleteMe = True
+            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].activeLasers)):
+                app.enemies['insidiousCreature'].activeLasers[projectileName].deleteMe = True
             elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['bigTooth'].checkSet)):
                 app.enemies['insidiousCreature'].multiples['bigTooth'].activeInstances.remove(projectileName)
             app.activeMapProjectiles.remove(projectileName)
@@ -2421,11 +2596,13 @@ def updateProjectiles(app):
 
     # update active player projectiles
     for projectileName in app.activePlayerProjectiles:
+        # updating projectiles that did not originate from player spells
         if(not app.projectile[projectileName].isPlayerSpell):
             endCondition = app.projectile[projectileName].move()
             if(endCondition):
                 app.projectile[projectileName].deleteMe = True
             
+        # running projectile deletion procedure for player projectiles
         if(app.projectile[projectileName].deleteMe):
             if(app.projectile[projectileName].isPlayerSpell):
                 app.spells[projectileName].xPosition = app.projectile[projectileName].xPosition
@@ -2438,7 +2615,9 @@ def updateProjectiles(app):
             del app.hitbox[projectileName]
             # print('also removed hitbox', projectileName)
 
+# assigning projectile-specific data and iniating it's associated hitbox
 def initiateProjectile(app,projectileName):
+    # setup for ghost sword player spell
     if(projectileName == 'ghostSword'):
         p = app.projectile[projectileName]
         p.directionalAcceleration = 10
@@ -2448,17 +2627,19 @@ def initiateProjectile(app,projectileName):
         xAdjustment = int(p.displayWidth * 0.1)
         yAdjustment = int(p.displayWidth * 0.9)
         initiateHitbox(app,projectileName,p,'player',xAdjustment,yAdjustment,'hitboxAngledRect')
+    # setup for a tooth-type projectile from Insidious Creature
     elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['tooth'].checkSet)):
         p = app.projectile[projectileName]
         p.directionalAcceleration = 5
         p.maxVelocity = 100
-        p.damage = 7
+        p.damage = 5
         p.initialYOffset = app.ti['ground'].yOffset
         xAdjustment = int(p.displayWidth * 0)
         yAdjustment = int(p.displayWidth * 0.75)
         # print('added new tooth!',projectileName)
         initiateHitbox(app,projectileName,p,'enemy',xAdjustment,yAdjustment,'hitboxAngledRect')
-    elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['lazer'].checkSet)):
+    # setup for a laser type projectile from Insidious Creature
+    elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['laser'].checkSet)):
         p = app.projectile[projectileName]
         p.directionalAcceleration = 10
         p.maxVelocity = 1000
@@ -2466,18 +2647,9 @@ def initiateProjectile(app,projectileName):
         p.initialYOffset = app.ti['ground'].yOffset
         xAdjustment = int(p.displayWidth * 0)
         yAdjustment = int(p.displayHeight * 0.7)
-        # print('added new lazer!',projectileName)
+        # print('added new laser!',projectileName)
         initiateHitbox(app,projectileName,p,'enemy',xAdjustment,yAdjustment,'hitboxAngledRect')
-    elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['bigTooth'].checkSet)):
-        p = app.projectile[projectileName]
-        p.directionalAcceleration = 10
-        p.maxVelocity = 100
-        p.damage = 25
-        p.initialYOffset = app.ti['ground'].yOffset
-        xAdjustment = int(p.displayWidth * 0)
-        yAdjustment = int(p.displayHeight * 0.2)
-        # print('added new lazer!',projectileName)
-        initiateHitbox(app,projectileName,p,'enemy',xAdjustment,yAdjustment,'hitboxAngledRect')
+    # setup for the level one slime ball player spell
     elif(projectileName == 'levelOneSlimeBall'):
         p = app.projectile[projectileName]
         p.directionalVelocity = 10
@@ -2491,6 +2663,7 @@ def initiateProjectile(app,projectileName):
         p.damage = 10
         p.inheritPlayerVelocity = True
         initiateHitbox(app,projectileName,p,'player',0,0,'hitboxCircle')
+    # setup for the test ball player spell
     elif(projectileName == 'testBall'):
         p = app.projectile[projectileName]
         p.directionalAcceleration = 0.5
@@ -2500,13 +2673,17 @@ def initiateProjectile(app,projectileName):
         p.radius = int(p.imageScale * 100)
         p.damping = 10
         initiateHitbox(app,projectileName,p,'player',0,0,'hitboxCircle')
+    # reporting an error should the projectile name be unrecognized
     else:
-        reportError('getting projectie data','UNRECOGNIZED PROJECTILE','initiateProjectile','recieved unexpected projectile name',projectileName,None)
+        reportError('getting projectile data','UNRECOGNIZED PROJECTILE','initiateProjectile','recieved unexpected projectile name',projectileName,None)
 
 # ENEMIES
 def initiateTheHideousBeast(app,Physics):
+    # setting up position data
     initialX = 100
     initialY = app.ti['ground'].initialTileYPosition-80
+
+    # making the hideous beast an entry in the app.enemies dictionary
     app.enemies['theHideousBeast'] = TheHideousBeast('theHideousBeast',0,500,500,0.7,'center',100,0,initialX,initialY,500,10)
 
     # initiating hitbox for the hideous beast
@@ -2533,8 +2710,11 @@ def initiateTheHideousBeast(app,Physics):
     app.setGravity = -150
 
 def initiateInsidiousCreature(app,Physics):
+    # setting up initial position data
     initialX = app.screenWidth * 1.5
     initialY = app.ti['ground'].initialTileYPosition-80
+
+    # making the Insidious Creature an entry in the app.enemies dictionary
     app.enemies['insidiousCreature'] = InsidiousCreature('insidiousCreature',0,500,500,0.6,'center',100,0,initialX,initialY,1500,15)
 
     # establishing the hitbox radius for the Insidious Creature
@@ -2563,17 +2743,21 @@ def initiateInsidiousCreature(app,Physics):
     app.icPhysics['y'].frictionConstant = -15
 
 def updateEnemies(app):
+    # initiating empty deletion set
     enemiesToDelete = set()
+    # looping through currently active enemies
     for enemyName in app.enemies:
         enemy = app.enemies[enemyName]
         enemy.move(app)
         enemy.updateImage(app)
         enemy.updateState(app)
+        # checking for deletion
         if(enemy.deleteMe):
             if(enemyName == app.currentBoss):
                 app.currentBoss = None
             enemiesToDelete.add(enemyName)
-
+    
+    # deleting enemies
     for enemyToDelete in enemiesToDelete:
         del app.enemies[enemyToDelete]
         del app.hitbox[enemyToDelete]
@@ -2591,6 +2775,7 @@ def updateGui(app):
             app.startCutsceneOverlayOpacity = max((app.startCutsceneOverlayOpacity*0.95), 0)
         else:
             app.startCutsceneOverlayOpacity = 0
+        
         # recharging mana if player is not currently casting a spell
         if((app.playerMana < app.playerMaxMana) and (not app.castingSpell)):
             if((app.playerManaRechargeCounter % app.playerManaRechargeSpeed) == 0):
@@ -2599,21 +2784,26 @@ def updateGui(app):
             if(app.playerMana >= app.playerMaxMana):
                 app.playerManaRechargeCounter = 0
                 app.playerMana = app.playerMaxMana
+        
         # setting game state to 'dead' if player has died
         if(app.playerHealth == 0):
             app.gameState = 'dead'
+        
         # changing position of spell scroll
         if((app.displaySpellScroll) and (app.gui['spellScroll'].yPosition > app.spellScrollTopYPosition)):
             app.gui['spellScroll'].yPosition = max(int(app.gui['spellScroll'].yPosition * app.scrollOpenSpeed)-1 , app.spellScrollTopYPosition)
         elif((not(app.displaySpellScroll)) and (app.gui['spellScroll'].yPosition < app.spellScrollBottomYPosition)):
             app.gui['spellScroll'].yPosition = min(int(app.gui['spellScroll'].yPosition * app.scrollCloseSpeed)+1 , app.spellScrollBottomYPosition)
+        
         # indexing combo counter
         if(app.comboCounter != 0):
             app.comboCounter -= 1
+        
         # adjusting combo shake
         if(app.comboShake > 0):
             app.comboShake = max(int(app.comboShake * 0.9)-1, 0)
-        # updating edge darkness
+        
+        # updating edge darkness and timer
         if(abs(app.totalXOffset) > app.edgeFadeBounds):
             app.edgeDarknessOpacity = min(100, int((abs(app.totalXOffset) - app.edgeFadeBounds) * app.edgeFadeRate))
             if(app.edgeDarknessOpacity == 100):
@@ -2643,7 +2833,7 @@ def updateGui(app):
     
     # handling edge fade death cutscene
     elif(app.gameState == 'fadeCutscene'):
-        #play crunch sounds
+        # play crunch sounds
         app.edgeFadeDeathTimer += 1
         if(app.edgeFadeDeathTimer >= 150):
             app.playerHealth = 0
@@ -2658,17 +2848,48 @@ def updateGui(app):
         else:
             gameSetup(app)
 
+    # handling win cutscene
+    elif(app.gameState == 'winCutscene'):
+        # print(app.winTimer)
+        if(app.winTimer >= (app.stepsPerSecond * 2)):
+            app.winCutsceneOverlayOpacity = min((app.winCutsceneOverlayOpacity * (1.1)), 100)
+            if(app.winCutsceneOverlayOpacity == 100):
+                app.gameState = 'win'
+                app.gui['license'].displayAngle = 90
+        app.winTimer += 1
+    
+    # handling win state and license animation
+    if(app.gameState == 'win'):
+        if(app.winCutsceneOverlayOpacity != 0):
+            app.winCutsceneOverlayOpacity = max(((app.winCutsceneOverlayOpacity * (0.95))-1), 0)
+        if(app.gui['license'].imageScale != 1):
+            app.gui['license'].imageScale = min((app.gui['license'].imageScale * (1.05)), 1)
+            app.gui['license'].displayAngle += app.lisenceRotationSpeed
+            app.lisenceRotationSpeed *= 0.99
+        else:
+            if(app.gui['license'].displayAngle != 0):
+                app.gui['license'].displayAngle = 0
+                app.winTimer = 0
+            if(app.winTimer > (app.stepsPerSecond * 5)):
+                if(app.restartPromptOpacity != app.restartPromptMaxOpacity):
+                    app.restartPromptOpacity += 1
+        app.winTimer += 1    
+
 def drawGuiElement(app,elementName,xOffset=0,yOffset=0):
+    # establishing data
     path = app.gui[elementName].imagePath
     x = app.gui[elementName].xPosition + xOffset
     y = app.gui[elementName].yPosition + yOffset
     width = int(app.gui[elementName].imageWidth * app.gui[elementName].imageScale)
     height = int(app.gui[elementName].imageHeight * app.gui[elementName].imageScale)
     opacity = app.gui[elementName].opacity
+    displayAngle = app.gui[elementName].displayAngle
     alignment = app.gui[elementName].alignment
-    drawImage(path,x,y,width=width,height=height,opacity=opacity,align=alignment)       
+    # drawing
+    drawImage(path,x,y,width=width,height=height,rotateAngle=displayAngle,opacity=opacity,align=alignment)       
 
 def drawCombo(app):
+    # setting up initial data
     i = 0
     comboShakeX = random.randint(-app.comboShake, app.comboShake)
     comboShakeY = random.randint(-app.comboShake, app.comboShake)
@@ -2680,74 +2901,129 @@ def drawCombo(app):
     splashTextDict['insufficient mana!'] = 'images/GUI/comboInsufficientMana.png'
     splashTextDict['cancel'] = 'images/GUI/comboChargeCancelled.png'
 
+    # checking if the display combo is one of the special splash tects, and 
+    # displaying the appopriate image from the splash text dictionary if so
     if(app.displayCombo in splashTextDict):
         if(app.comboCounter != 0):
             drawImage(splashTextDict[app.displayCombo], (app.comboImageTop + (i * app.comboImageSpacing) + comboShakeX), (app.comboImageLeft + comboShakeY), width = int(app.comboDetailTextWidth * app.comboImageScale), height = int(app.comboImageSize * app.comboImageScale))
+    # otherwise, we loop through the characters in the display combo and display
+    # their associated image
     else:
         for char in app.displayCombo:
             comboImagePath = f'images/GUI/combo_{char}.PNG'
+            # if the image path does not exist, we report an error
+            # this is likely the result of an improperly named image, or
+            # an invalid combo
             if(not(os.path.exists(comboImagePath))):
                 reportError('accessing desired combo indicator file', 'IMAGE COULD NOT BE FOUND', 'drawCombo', 'File name', comboImagePath, None)
             drawImage(comboImagePath, (app.comboImageTop + (i * app.comboImageSpacing) + comboShakeX), (app.comboImageLeft + comboShakeY), width = int(app.comboImageSize * app.comboImageScale), height = int(app.comboImageSize * app.comboImageScale))
             i += 1
 
+def drawDRO(app):
+    # drawing base element
+    drawGuiElement(app,'wizardDRO')
+    
+    # establishing data
+    droHeight = int(app.gui['wizardDRO'].imageHeight * app.gui['wizardDRO'].imageScale)
+    droWidth = int(app.gui['wizardDRO'].imageWidth * app.gui['wizardDRO'].imageScale)
+    droBarMaxWidth = 97
+    droBarHeight = int(droHeight // 6)
+    droHealthBarWidth = max(droBarMaxWidth*(app.playerHealth/app.playerMaxHealth),0.001)
+    droManaBarWidth = droBarMaxWidth*(app.playerMana/app.playerMaxMana)
+    droBarLeft = app.gui['wizardDRO'].xPosition + int(droWidth // 8.9) 
+    droHealthBarTop = app.gui['wizardDRO'].yPosition + int(droHeight // 3)
+    droManaBarTop = droHealthBarTop + int(droHeight // 2.5) 
+    droBarOpacity = 50
+    droBarFill = RGB(50,209,2)
+    
+    # drawing health and mana bars
+    drawRect(droBarLeft,droHealthBarTop,droHealthBarWidth,droBarHeight,fill = droBarFill, opacity = droBarOpacity)
+    drawRect(droBarLeft,droManaBarTop,droManaBarWidth,droBarHeight,fill = droBarFill, opacity = droBarOpacity)
+    
+    # drawing decorative grille over top
+    drawGuiElement(app,'wizardDROGrille')
+
+def drawBossBar(app):
+    # establishing data
+    enemy =  app.enemies[app.currentBoss]
+    bossBarHeight = int(app.gui['bossBar'].imageHeight * app.gui['bossBar'].imageScale)
+    bossBarWidth = int(app.gui['bossBar'].imageWidth * app.gui['bossBar'].imageScale)
+    bossHealthMaxWidth = int(bossBarWidth * 0.85)
+    bossHealthWidth = (bossHealthMaxWidth * enemy.health / enemy.maxHealth)
+    bossHealthHeight = bossBarHeight * 0.09
+    bossHealthLeft = app.gui['bossBar'].xPosition - (bossBarWidth * 0.42)
+    bossHealthTop = app.gui['bossBar'].yPosition + (bossBarHeight * 0.1)
+    
+    # checking enemy health first
+    if(enemy.health != 0):
+        # drawing boss bar elements and rectangular bar itself
+        drawGuiElement(app,'bossBarBackground')
+        drawRect(bossHealthLeft, bossHealthTop, bossHealthWidth, bossHealthHeight, fill = 'crimson')
+        drawGuiElement(app,f'{app.currentBoss}Title')
+        drawGuiElement(app,'bossBar')
+    else:
+        # silly death mesage should the boss be dead
+        print('he hath exploded')
+
 def drawGui(app):
+    # handling fade cutscene
     if(app.gameState == 'fadeCutscene'):
         drawRect(0,0,app.screenWidth,app.screenHeight,fill='black')
-    if(app.gameState in {'main','dead','paused'}):
+    
+    if(app.gameState in {'main','dead','paused','winCutscene','win'}):
         if(app.gameState != 'fadeCutscene'):
-            drawGuiElement(app,'wizardDRO')
-            droHeight = int(app.gui['wizardDRO'].imageHeight * app.gui['wizardDRO'].imageScale)
-            droWidth = int(app.gui['wizardDRO'].imageWidth * app.gui['wizardDRO'].imageScale)
-            droBarMaxWidth = 97
-            droBarHeight = int(droHeight // 6)
-            droHealthBarWidth = max(droBarMaxWidth*(app.playerHealth/app.playerMaxHealth),0.001)
-            droManaBarWidth = droBarMaxWidth*(app.playerMana/app.playerMaxMana)
-            droBarLeft = app.gui['wizardDRO'].xPosition + int(droWidth // 8.9) 
-            droHealthBarTop = app.gui['wizardDRO'].yPosition + int(droHeight // 3)
-            droManaBarTop = droHealthBarTop + int(droHeight // 2.5) 
-            droBarOpacity = 50
-            droBarFill = RGB(50,209,2)
-            drawRect(droBarLeft,droHealthBarTop,droHealthBarWidth,droBarHeight,fill = droBarFill, opacity = droBarOpacity)
-            drawRect(droBarLeft,droManaBarTop,droManaBarWidth,droBarHeight,fill = droBarFill, opacity = droBarOpacity)
-            drawGuiElement(app,'wizardDROGrille')
+            # drawing wizard dro, the health and mana indicator
+            drawDRO(app)
+            
+            # drawing current combo
             drawCombo(app)
+            
+            # drawing boss bar 
             if(app.currentBoss != None):
-                enemy =  app.enemies[app.currentBoss]
-                bossBarHeight = int(app.gui['bossBar'].imageHeight * app.gui['bossBar'].imageScale)
-                bossBarWidth = int(app.gui['bossBar'].imageWidth * app.gui['bossBar'].imageScale)
-                bossHealthMaxWidth = int(bossBarWidth * 0.85)
-                bossHealthWidth = (bossHealthMaxWidth * enemy.health / enemy.maxHealth)
-                bossHealthHeight = bossBarHeight * 0.09
-                bossHealthLeft = app.gui['bossBar'].xPosition - (bossBarWidth * 0.42)
-                bossHealthTop = app.gui['bossBar'].yPosition + (bossBarHeight * 0.1)
-                if(enemy.health != 0):
-                    drawGuiElement(app,'bossBarBackground')
-                    drawRect(bossHealthLeft, bossHealthTop, bossHealthWidth, bossHealthHeight, fill = 'crimson')
-                    drawGuiElement(app,f'{app.currentBoss}Title')
-                    drawGuiElement(app,'bossBar')
-                else:
-                    print('he hath exploded')
-                    pass
+                drawBossBar(app)
+
             if(app.gameState != 'paused'):
+                # displaying spell scroll
                 if(((app.displaySpellScroll) and (app.gui['spellScroll'].yPosition >= app.spellScrollTopYPosition)) or ((not(app.displaySpellScroll)) and (app.gui['spellScroll'].yPosition < app.spellScrollBottomYPosition))):
                     drawGuiElement(app,'spellScroll',random.randint(-app.scrollShakeMagnitude,app.scrollShakeMagnitude),random.randint(-app.scrollShakeMagnitude,app.scrollShakeMagnitude))
         
+        # displaying edge overlay
         if(app.edgeDarknessOpacity != 0):
             drawRect(0,0,app.screenWidth,app.screenHeight,fill='black',opacity = app.edgeDarknessOpacity)
 
+        # displaying tutorial tip
+        drawLabel('press SPACE for tutorial',10,(app.screenHeight-10),fill='lightGray',align='left-bottom')
+        
+        # displaying pause screen
         if(app.gameState == 'paused'):
             drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.pauseScreenOpacity)
             drawGuiElement(app,'pauseText')
         
+        # displaying death screen
         elif(app.gameState == 'dead'):
             drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.deathCutsceneOverlayOpacity) 
             drawGuiElement(app,'deathText')
 
+    # displaying start menu elements
     elif(app.gameState in {'menu','startCutscene'}):
         drawGuiElement(app,'titleScreen')
         drawGuiElement(app,'menuPlayButton')
+    
+    # displaying tutorial
+    elif(app.gameState == 'tutorial'):
+        drawGuiElement(app,'tutorial')
 
+    # displaying win screen and win cutscene overlay
+    if(app.gameState in {'win', 'winCutscene'}):
+        if(app.gameState == 'win'):
+            drawGuiElement(app,'winScreen')
+            drawGuiElement(app,'license')
+            if(app.restartPromptOpacity != 0):
+                drawLabel("press 'r' to restart",(app.screenWidth // 2), (app.screenHeight - 15), fill = 'white', size = 15, align = 'center', opacity = app.restartPromptOpacity)
+        if(app.winCutsceneOverlayOpacity != 0):
+            drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.winCutsceneOverlayOpacity)
+
+    # displaying start cutscene overlay
     if(app.startCutsceneOverlayOpacity != 0):
         drawRect(0,0,app.screenWidth,app.screenHeight,fill = 'black', opacity = app.startCutsceneOverlayOpacity)  
 
@@ -2776,6 +3052,7 @@ def updateScreenShake(app):
 
 # HITBOX & HITBOX MANAGEMENT
 def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,hitboxType):
+    # initiating cuircular hitboxes
     if(hitboxType == 'hitboxCircle'):
         # print('initiated circle')
         x = associatedObject.xPosition
@@ -2785,6 +3062,8 @@ def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,h
         h = app.hitbox[name]
         h.associatedObject = associatedObject
         h.belongsTo = belongsTo
+
+    # initiating rectangular hitboxes that are not rotated
     elif(hitboxType == 'hitboxRect'):
         # these calculations work for objects that are displayed relative to their CENTER
         left = associatedObject.xPosition - (associatedObject.displayWidth//2) + xAdjustment
@@ -2797,12 +3076,14 @@ def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,h
         h.yAdjustment = yAdjustment
         h.associatedObject = associatedObject
         h.belongsTo = belongsTo
+
+    # iniating angled rectangular hitboxes
     elif(hitboxType == 'hitboxAngledRect'):
         # print('initiated AngledRect')
         centerX = associatedObject.xPosition
-        centerY = associatedObject.yPosition - associatedObject.initialYOffset
+        centerY = associatedObject.yPosition
         targetX = associatedObject.targetX
-        targetY = associatedObject.targetY - associatedObject.initialYOffset
+        targetY = associatedObject.targetY
         # print(associatedObject.initialYOffset)
         # print(centerX, centerY)
         width = associatedObject.displayWidth - xAdjustment
@@ -2812,28 +3093,38 @@ def initiateHitbox(app,name,associatedObject,belongsTo,xAdjustment,yAdjustment,h
         rotationAngle = getAngle(dx, dy, 'degrees')
         # ptc('rotationAngle',rotationAngle)
         [(x_1,y_1),(x_2,y_2),(x_3,y_3),(x_4,y_4)] = applyRectangleRotation(centerX, centerY, width, height, rotationAngle)
-        app.hitbox[name] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4)
+        app.hitbox[name] = HitboxAngledRect(x_1,y_1,x_2,y_2,x_3,y_3,x_4,y_4,associatedObject)
         h = app.hitbox[name]
-        h.associatedObject = associatedObject
         h.belongsTo = belongsTo
         # print('coordinates:',p.x_1,p.y_1,p.x_2,p.y_2,p.x_3,p.y_3,p.x_4,p.y_4)
+    
+    # reporting an error if hitbox type is not recognized
     else:
         reportError('attempting to initiate hitbox','UNRECOGNIZED HITBOX TYPE','initiateHitbox','recieved hitbox type',type(hitboxType),None)
     
 def updateHitbox(app,hitbox):
+    # updating circular hitboxes
     if(isinstance(hitbox,HitboxCircle)):
         hitbox.align(hitbox.associatedObject)
+    
+    # updating rectangular hitboxes, except if they are the player's, since
+    # in that case there is no associated object to align to
     elif(isinstance(hitbox,HitboxRect)):
         if(hitbox == app.hitbox['player']):
             return
         else:
             hitbox.align(hitbox.associatedObject)
+    
+    # updating angled rectangular hitboxes
     elif(isinstance(hitbox,HitboxAngledRect)):
         hitbox.align(hitbox.associatedObject)
+   
+   # reporting an error if hitbox type is unrecognized
     else:
         reportError('attempting to update hitbox','UNRECOGNIZED HITBOX TYPE','updateHitbox','recieved hitbox type',type(hitbox),None)
 
 def displayHitbox(app,hitbox):
+    # displaying circular hitboxes
     if(isinstance(hitbox,HitboxCircle)):
         x = hitbox.xPosition + hitbox.xOffset
         y = hitbox.yPosition + hitbox.yOffset
@@ -2842,86 +3133,88 @@ def displayHitbox(app,hitbox):
         # ptc('y',y)
         # ptc('radius',radius)
         drawCircle(x, y, radius, fill = None, border = 'cyan' )
+    
+    # displaying rectangular hitboxes
     elif(isinstance(hitbox,HitboxRect)):
         width = hitbox.right - hitbox.left
         height = hitbox.bottom - hitbox.top
         x = hitbox.left + hitbox.xOffset
         y = hitbox.top + hitbox.yOffset
         drawRect(x, y, width, height, fill = None, border = 'red')
+    
+    # displaying angled rectangular hitboxes
     elif(isinstance(hitbox,HitboxAngledRect)):
-        # how can i NOT have to pass these many things in!
         drawPolygon((hitbox.x_1 + hitbox.xOffset), (hitbox.y_1 + hitbox.yOffset), (hitbox.x_2 + hitbox.xOffset), (hitbox.y_2 + hitbox.yOffset), (hitbox.x_3 + hitbox.xOffset), (hitbox.y_3 + hitbox.yOffset), (hitbox.x_4 + hitbox.xOffset), (hitbox.y_4 + hitbox.yOffset), fill = None, border = 'magenta')
+    
+    # returning an error if hitbox type is unrecognized
     else:
         reportError('attempting to display hitbox','UNRECOGNIZED HITBOX TYPE','displayHitbox','recieved hitbox type',type(hitbox),None)
 
-def triggerCollisionEffect(app,hitbox_1,hitbox_2):
-    # check collisions with player
-    if((hitbox_1.associatedObject == app.playerObject) or (hitbox_2.associatedObject == app.playerObject)):
-        if(hitbox_1.associatedObject == app.playerObject):
-            otherHitbox = hitbox_2
+def triggerPlayerCollision(app,hitbox_1,hitbox_2):
+    # determining hitbox ownership
+    if(hitbox_1.associatedObject == app.playerObject):
+        otherHitbox = hitbox_2
+    else:
+        otherHitbox = hitbox_1
+    if(otherHitbox.belongsTo == 'player'):
+        # player's projectiles that collide with themselves should not have 
+        # adverse effects
+        return
+    # if either the enemy or the enemy's projectiles hit the player we want
+    # to specify their effects
+    elif(otherHitbox.belongsTo == 'enemy'):
+        # if the enemy's hitbox collides with the player:
+        if(isinstance(otherHitbox.associatedObject, TheHideousBeast) or isinstance(otherHitbox.associatedObject, InsidiousCreature)):
+            if(app.playerImmunityFrames == 0):
+                app.playerHealth =  max((app.playerHealth - otherHitbox.associatedObject.playerDamageOnHit), 0)
+                app.playerImmunityFrames = otherHitbox.associatedObject.playerDamageOnHit
+                app.screenShakeMagnitude += 4
+        # if an enemy's projectile collides with the player
+        elif(isinstance(otherHitbox.associatedObject, Projectile)):
+            app.playerHealth = max((app.playerHealth - otherHitbox.associatedObject.damage), 0)
+            otherHitbox.associatedObject.deleteMe = True
+            app.screenShakeMagnitude += 2
+            # if the enemy projectile is a laser we want to delete the laser object too
+            # print(otherHitbox.associatedObject.name)
+            # print(app.enemies['insidiousCreature'].multiples['laser'].activeInstances)
+            if(('insidiousCreature' in app.enemies) and (otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['laser'].activeInstances)):
+                app.enemies['insidiousCreature'].activeLasers[otherHitbox.associatedObject.name].deleteMe = True
+                # print('removed laser on hit')
+    # check collisions with pickups
+    elif(otherHitbox.belongsTo == 'pickup'):
+        pickup = otherHitbox.associatedObject
+        # check mana pickup
+        if(pickup.pickupType == 'manaPickup'):
+            # print('collided with mana pickup!')
+            app.playerMana = min(app.playerMana + pickup.restorationAmmount, app.playerMaxMana)
+            pickup.deleteMe = True
+        # check health pickup
+        elif(pickup.pickupType == 'healthPickup'):
+            # print('collided with health pickup!')
+            app.playerHealth = min(app.playerHealth + pickup.restorationAmmount, app.playerMaxHealth)
+            pickup.deleteMe = True
+
+def triggerEnemyCollision(app,hitbox_1,hitbox_2):
+    if(isinstance(hitbox_1.associatedObject, Enemy) and not isinstance(hitbox_2.associatedObject, Enemy)):
+        enemyHitbox = hitbox_1    
+        otherHitbox = hitbox_2
+    elif(isinstance(hitbox_2.associatedObject, Enemy) and not isinstance(hitbox_1.associatedObject, Enemy)):
+        enemyHitbox = hitbox_2
+        otherHitbox = hitbox_1
+    else:
+        return
+    # check if the enemy has collided with a projectile
+    if(isinstance(otherHitbox.associatedObject, Projectile)):
+        # if the projectile belongs to the player, we want to apply the apropriate effect
+        if((otherHitbox.belongsTo == 'player') and (not enemyHitbox.associatedObject.invulnerable)):
+            # print('contact!:',otherHitbox.associatedObject.name)
+            enemyHitbox.associatedObject.health = max(enemyHitbox.associatedObject.health - otherHitbox.associatedObject.damage, 0)
+            otherHitbox.associatedObject.deleteMe = True
         else:
-            otherHitbox = hitbox_1
-        if(otherHitbox.belongsTo == 'player'):
-            # player's projectiles that collide with themselves should not have 
-            # adverse effects
             return
-        # if either the enemy or the enemy's projectiles hit the player we want
-        # to specify their effects
-        elif(otherHitbox.belongsTo == 'enemy'):
-            # if the enemy's hitbox collides with the player:
-            if(isinstance(otherHitbox.associatedObject, TheHideousBeast) or isinstance(otherHitbox.associatedObject, InsidiousCreature)):
-                if(app.playerImmunityFrames == 0):
-                    app.playerHealth =  max((app.playerHealth - otherHitbox.associatedObject.playerDamageOnHit), 0)
-                    app.playerImmunityFrames = otherHitbox.associatedObject.playerDamageOnHit
-                    app.screenShakeMagnitude += 4
-            # if an enemy's projectile collides with the player
-            elif(isinstance(otherHitbox.associatedObject, Projectile)):
-                app.playerHealth = max((app.playerHealth - otherHitbox.associatedObject.damage), 0)
-                otherHitbox.associatedObject.deleteMe = True
-                app.screenShakeMagnitude += 2
-                # if the enemy projectile is a lazer we want to delete the lazer object too
-                # print(otherHitbox.associatedObject.name)
-                # print(app.enemies['insidiousCreature'].multiples['lazer'].activeInstances)
-                if(('insidiousCreature' in app.enemies) and (otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['lazer'].activeInstances)):
-                    app.enemies['insidiousCreature'].activeLazers[otherHitbox.associatedObject.name].deleteMe = True
-                    # print('removed lazer on hit')
-        # check collisions with pickups
-        elif(otherHitbox.belongsTo == 'pickup'):
-            pickup = otherHitbox.associatedObject
-            # check mana pickup
-            if(pickup.pickupType == 'manaPickup'):
-                # print('collided with mana pickup!')
-                app.playerMana = min(app.playerMana + pickup.restorationAmmount, app.playerMaxMana)
-                pickup.deleteMe = True
-            # check health pickup
-            elif(pickup.pickupType == 'healthPickup'):
-                # print('collided with health pickup!')
-                app.playerHealth = min(app.playerHealth + pickup.restorationAmmount, app.playerMaxHealth)
-                pickup.deleteMe = True
-    
-    # check collisions with enemy
-    elif(isinstance(hitbox_1.associatedObject, Enemy) or isinstance(hitbox_2.associatedObject, Enemy)):
-        if(isinstance(hitbox_1.associatedObject, Enemy) and not isinstance(hitbox_2.associatedObject, Enemy)):
-            enemyHitbox = hitbox_1    
-            otherHitbox = hitbox_2
-        elif(isinstance(hitbox_2.associatedObject, Enemy) and not isinstance(hitbox_1.associatedObject, Enemy)):
-            enemyHitbox = hitbox_2
-            otherHitbox = hitbox_1
-        else:
-            return
-        # check if the enemy has collided with a projectile
-        if(isinstance(otherHitbox.associatedObject, Projectile)):
-            # if the projectile belongs to the player, we want to apply the apropriate effect
-            if((otherHitbox.belongsTo == 'player') and (not enemyHitbox.associatedObject.invulnerable)):
-                # print('contact!:',otherHitbox.associatedObject.name)
-                enemyHitbox.associatedObject.health = max(enemyHitbox.associatedObject.health - otherHitbox.associatedObject.damage, 0)
-                otherHitbox.associatedObject.deleteMe = True
-            else:
-                return
-    
-    # check collisions with the player's shield
-    if(app.spells['shield'] in app.spellData['defensive'].activeSpell):
-        # shield collisions we care about are when the enemy collides with the
+
+def triggerShieldCollision(app,hitbox_1,hitbox_2):
+    # shield collisions we care about are when the enemy collides with the
         # shield, or if the enemy's projectile collides with the shield
         # we want the shield to break when the enemy collides with it
         # and we want the shield to break when the enemy projectile collides 
@@ -2945,9 +3238,9 @@ def triggerCollisionEffect(app,hitbox_1,hitbox_2):
                 shieldHitbox.associatedObject.opacity = 0
                 app.removeShield = True
             elif(isinstance(otherHitbox.associatedObject, Projectile)):
-                # ignoring shield if contacted lazer or big tooth
+                # ignoring shield if contacted laser or big tooth
                 if('insidiousCreature' in app.enemies):
-                    if(not((otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['lazer'].activeInstances) or (otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['bigTooth'].activeInstances))):
+                    if(not((otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['laser'].activeInstances) or (otherHitbox.associatedObject.name in app.enemies['insidiousCreature'].multiples['bigTooth'].activeInstances))):
                         otherHitbox.associatedObject.deleteMe = True
                         app.removeShield = True
                 else:
@@ -2958,7 +3251,20 @@ def triggerCollisionEffect(app,hitbox_1,hitbox_2):
                     app.removeShield = True
                 # print('shield collided with enemy projectile!')
         else:
-            return       
+            return   
+
+def triggerCollisionEffect(app,hitbox_1,hitbox_2):
+    # check collisions with player
+    if((hitbox_1.associatedObject == app.playerObject) or (hitbox_2.associatedObject == app.playerObject)):
+        triggerPlayerCollision(app,hitbox_1,hitbox_2)
+    
+    # check collisions with enemy
+    elif(isinstance(hitbox_1.associatedObject, Enemy) or isinstance(hitbox_2.associatedObject, Enemy)):
+        triggerEnemyCollision(app,hitbox_1,hitbox_2)
+
+    # check collisions with the player's shield
+    if(app.spells['shield'] in app.spellData['defensive'].activeSpell):
+        triggerShieldCollision(app,hitbox_1,hitbox_2)    
 
 def checkCollisionType(hitbox_1, hitbox_2):
     result = set()
@@ -2984,6 +3290,8 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
 
     # check what kind of collision we have to run the calculations for
     collisionType = checkCollisionType(hitbox_1, hitbox_2)
+
+    # collision between two circles
     if(collisionType == {'hitboxCircle'}):
         x_1 = hitbox_1.xPosition + hitbox_1.xOffset
         y_1 = hitbox_1.yPosition + hitbox_1.yOffset
@@ -2992,6 +3300,7 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         if(getDistance(x_1,y_1,x_2,y_2) <= (hitbox_1.radius + hitbox_2.radius)):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
     
+    # collision between two rectangles
     elif(collisionType == {'hitboxRect'}):
         left_1 = hitbox_1.left + hitbox_1.xOffset
         right_1 = hitbox_1.right + hitbox_1.xOffset
@@ -3017,8 +3326,8 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         if(xOverlap and yOverlap):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
             # print('both rectangles')
-            pass
     
+    # collision between two angled rectangles
     elif(collisionType == {'hitboxAngledRect'}):
         hVertList_1 = []
         for i in hitbox_1.getVertList():
@@ -3027,9 +3336,9 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         for i in hitbox_2.getVertList():
             hVertList_2.append([(i[0] + hitbox_2.xOffset),(i[1] + hitbox_2.yOffset)])
         if(checkConvexPolygonIntersection(hVertList_1,hVertList_2) or checkConvexPolygonIntersection(hVertList_2,hVertList_1)):
-            triggerCollisionEffect(app, hitbox_1, hitbox_2)
-            pass        
+            triggerCollisionEffect(app, hitbox_1, hitbox_2)      
     
+    # collision between one circle and one rectangle
     elif(collisionType == {'hitboxCircle', 'hitboxRect'}):
         if(isinstance(hitbox_1,HitboxCircle)):
             hitboxCircle = hitbox_1
@@ -3047,6 +3356,7 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
             # print('one circle, one rectangle')
     
+    # collision between one circle and one angled rectangle
     elif(collisionType == {'hitboxCircle', 'hitboxAngledRect'}):
         if(isinstance(hitbox_1,HitboxCircle)):
             hitboxCircle = hitbox_1
@@ -3065,6 +3375,7 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         if(checkConvexPolygonIntersection(circleVert,hARVertList) or distanceCheck):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
     
+    # collision between one rectangle and one angled rectangle
     elif(collisionType == {'hitboxRect', 'hitboxAngledRect'}):
         if(isinstance(hitbox_1,HitboxRect)):
             hitboxRect = hitbox_1
@@ -3087,6 +3398,7 @@ def runCollisionCalculations(app, hitboxName_1, hitboxName_2):
         if(checkConvexPolygonIntersection(hARVertList,hRVertList) or checkConvexPolygonIntersection(hRVertList,hARVertList)):
             triggerCollisionEffect(app, hitbox_1, hitbox_2)
     
+    # report an error if collision type is unrecognized
     else:
         reportError('attempting to run collision calculations','UNRECOGNIZED COLLISION TYPE','runCollisionCalculations','recieved collision type',collisionType,None)
 
@@ -3112,9 +3424,6 @@ def checkCollisions(app):
     # check all collisions except if keys are indentical
     # dont double check collisions, it's likely that hash of each name will be
     # different, so ONLY check the ones where hash(A) > hash(B) for isntance
-
-    # TRY TO FIGURE OUT HOW TELL IF TWO CONVEX POLYGONS COLLIDE - can do it for two rectanges
-    pass
 
 # COMBO MANAGEMENT
 def setupCombos(app):
@@ -3144,6 +3453,7 @@ def matchesCombo(app):
     combosIn = 0
     for possibleCombo in app.fullComboSet:
         letterMatch = True
+        # checking letter order
         for i in range(len(app.comboInProgress)):
             if(app.comboInProgress[i] != possibleCombo[i]):
                 letterMatch = False
@@ -3169,12 +3479,14 @@ def detectCombos(app,currentKey):
         app.displayCombo = app.comboInProgress
         # ptc('comboInProgress',app.comboInProgress)
         comboMatched = matchesCombo(app)
+        # invalid combo recieved
         if(comboMatched == False):
             app.comboCounter = 30
             app.comboShake += 10
             app.displayCombo = 'combo failed!'
             app.comboInProgress = ''
         elif(comboMatched != True):
+            # cancel combo recieved
             if(comboMatched == app.cancelCombo):
                 # print('charged Spell Canceled')
                 chargeSpell(app,'cancel')
@@ -3190,31 +3502,69 @@ def detectCombos(app,currentKey):
 
 # APP EVENT HANDLERS
 def onKeyPress(app,key):
-
     if(app.gameState == 'main'):
-        # TEMPORARY DEBUG KEY PRESSES
-        if(key == 'i'):
-            app.playerHealth = 10000
-            app.playerMaxHealth = 10000
-        if(key == 'o'):
-            app.enemies['insidiousCreature'].health = app.enemies['insidiousCreature'].phaseCheckpoint + 5
-        if(key == 'p'):
-            app.displayHitboxes = not app.displayHitboxes
-            # app.tempDisplayReadout = not app.tempDisplayReadou
-        if(key == 'm'):
-            app.screenShakeMagnitude += 5
-        if(key == 'l'):
-            app.displayScreenZones = not app.displayScreenZones
-        if(key == 'k'):
-            app.transparencyTest = not app.transparencyTest
-        if(key == 'j'):
-            app.displayShieldPositions = not app.displayShieldPositions
-        if(key == 'u'):
-            app.printMouseScreenSector = not app.printMouseScreenSector
-
-
+        # registeing keypresses for combos
         if(key in app.fullLetterSet):
             detectCombos(app,key)
+        
+        # checking if debug features should be enabled
+        if(key == '?'):
+            if(app.debugFeaturesEnabled):
+                app.debugFeaturesEnabled = False
+                app.debugFeatureDisplayText = []
+            else:
+                app.debugFeaturesEnabled = True
+                app.debugFeatureDisplayText.append('debug features enabled!')
+        
+        # debug features
+        if(app.debugFeaturesEnabled):
+            # make the player basically unkillable
+            if(key == ']'):
+                app.playerHealth = 10000
+                app.playerMaxHealth = 10000
+                playerHealthString = f'player health set to {app.playerMaxHealth}'
+                if(not (playerHealthString in app.debugFeatureDisplayText)):
+                    app.debugFeatureDisplayText.append(playerHealthString)
+            # put insidious creature one attack away from the next phase checkpoint
+            if(key == '['):
+                app.enemies['insidiousCreature'].health = app.enemies['insidiousCreature'].phaseCheckpoint + 5
+                insidiousCreatureHealthString = f'insidiousCreature health set to {app.enemies['insidiousCreature'].health}'
+                if(not (insidiousCreatureHealthString in app.debugFeatureDisplayText)):
+                    app.debugFeatureDisplayText.append(insidiousCreatureHealthString)
+            # display hitboxes
+            if(key == "'"):
+                if(app.displayHitboxes):
+                    app.displayHitboxes = False
+                    app.debugFeatureDisplayText.remove('displaying hitboxes')
+                else:
+                    app.displayHitboxes = True
+                    app.debugFeatureDisplayText.append('displaying hitboxes')
+            # display the screen zones
+            if(key == ';'):
+                if(app.displayScreenZones):
+                    app.displayScreenZones = False
+                    app.debugFeatureDisplayText.remove('displaying screen zones')
+                else:
+                    app.displayScreenZones = True
+                    app.debugFeatureDisplayText.append('displaying screen zones')
+            # display shield positions on the screen
+            if(key == '.'):
+                if(app.displayShieldPositions):
+                    app.displayShieldPositions = False
+                    app.debugFeatureDisplayText.remove('displaying shield positions')
+                else:
+                    app.displayShieldPositions = True
+                    app.debugFeatureDisplayText.append('displaying shield positions')
+            # print mouse screen sector on click
+            if(key == ','):
+                if(app.printMouseScreenSector):
+                    app.printMouseScreenSector = False
+                    app.debugFeatureDisplayText.remove('will display mouse screen sector on click')
+                else:
+                    app.printMouseScreenSector = True
+                    app.debugFeatureDisplayText.append('will display mouse screen sector on click')
+    
+    # checking for pause button
     if(app.gameState in {'main', 'paused'}):
         if(key == 'escape'):
             if(app.gameState == 'paused'):
@@ -3222,32 +3572,45 @@ def onKeyPress(app,key):
             else:
                 app.gameState = 'paused'
 
+    # checking for tutorial button
+    if(app.gameState in {'main', 'paused', 'tutorial'}):
+        if(key == 'space'):
+            if(app.gameState in {'main', 'paused'}):
+                app.gameState = 'tutorial'
+            elif(app.gameState == 'tutorial'):
+                app.gameState = 'main'
+
+    # checking for reset button
+    if(app.gameState == 'win'):
+        if(key == 'r'):
+            gameSetup(app)
+
 def onKeyHold(app,keys):
     if(app.gameState == 'main'):
-        # TESTING ONLY - DIRECTLY CHANGE OFFSETS
-        # if('d' in keys and not('a' in keys)):
-        #     for i in app.tileableImageList:
-        #         app.ti[i].xOffset += 10
-        # else:
-        #     for i in app.tileableImageList:
-        #         app.ti[i].xOffset -= 10
-
-        # X movement
-
         # SHORTEN ONCE FINISHED
+        # check to update the lightmap if any of the keys have been pressed
         if((('d' in keys) or ('a' in keys)) or (('w' in keys) or ('s' in keys))):
             updateLightmap(app,False)
+        
+        # X movement - keys d and a
         if(('d' in keys) or ('a' in keys)):
+            
+            # if both d and a are pressed, cancel the thrust
             if(('d' in keys) and ('a' in keys)):
                 app.player['x'].currentThrust = 0
+                # check altitude
                 if(app.ti['ground'].yOffset > app.currentPlayerGroundYOffset):
                     app.player['x'].frictionConstant = (app.player['y'].setFrictionConstant)
                 else:
                     app.player['x'].frictionConstant = (app.player['x'].setFrictionConstant)
+            
+            # if just d is pressed, apply thrust to the right
             elif(('d' in keys) and (not('a' in keys))):
                 app.playerFacing = 'right'
+                # check for slide condition
                 if(app.playerState != 'slide'):
                     app.player['x'].currentThrust = app.player['x'].setThrust 
+                    # check altitude
                     if(app.ti['ground'].yOffset > app.currentPlayerGroundYOffset):
                         app.player['x'].frictionConstant = (app.player['y'].setFrictionConstant)
                     else:
@@ -3255,10 +3618,14 @@ def onKeyHold(app,keys):
                 else:
                     app.player['x'].currentThrust = (app.player['x'].setThrust/10)
                     app.player['x'].frictionConstant = (app.player['x'].setFrictionConstant/100)
+            
+            # if just a is pressed, apply thrust to the left
             else:
                 app.playerFacing = 'left'
+                # check for slide condition
                 if(app.playerState != 'slide'):
-                    app.player['x'].currentThrust = -app.player['x'].setThrust 
+                    app.player['x'].currentThrust = -app.player['x'].setThrust
+                    # check altitude 
                     if(app.ti['ground'].yOffset > app.currentPlayerGroundYOffset):
                         app.player['x'].frictionConstant = (app.player['y'].setFrictionConstant)
                     else:
@@ -3266,92 +3633,130 @@ def onKeyHold(app,keys):
                 else:   
                     app.player['x'].currentThrust = -(app.player['x'].setThrust/10)
                     app.player['x'].frictionConstant = (app.player['x'].setFrictionConstant/100)
-        # Y movement
+        
+        # Y movement - keys w and s
         if(('w' in keys) or ('s' in keys)):
+            
+            # if both w and s are pressed, 
+            # apply glide thrust at appropriate altitude
             if(('w' in keys) and ('s' in keys)):
+                # check altitude
                 if(app.ti['ground'].yOffset > app.currentPlayerGroundYOffset):
                     app.player['y'].currentThrust = app.playerGlideThrust
                 app.player['y'].frictionConstant = (
                     app.player['y'].setFrictionConstant)
+                # register s pressed
                 app.sPressed = True
+            
+            # if just w is pressed
+            # apply upwards thrust as long as wing counter allows
             elif(('w' in keys) and (not('s' in keys))):
+                # check wing counter
                 if(app.playerWingCounter < app.maxPlayerWingCounter):
                     app.player['y'].currentThrust = (app.player['y'].setThrust-int((app.playerWingCounter/(app.maxPlayerWingCounter/10))**3)-app.setGravity)
                     app.playerWingCounter += 50
+                # check altitude
                 elif(app.ti['ground'].yOffset > app.currentPlayerGroundYOffset):
                     app.player['y'].currentThrust = app.playerGlideThrust
                 else: 
                     app.player['y'].currentThrust = 0
                 app.player['y'].frictionConstant = (
                     app.player['y'].setFrictionConstant)
+            
+            # if just s is pressed, apply glide thrust at appropriate altitude
             else:
+                # check altitude
                 if(app.ti['ground'].yOffset > app.currentPlayerGroundYOffset):
                     app.player['y'].currentThrust = app.playerGlideThrust
                 else: 
                     app.player['y'].currentThrust = 0
                 app.player['y'].frictionConstant = (
                     app.player['y'].setFrictionConstant)
+                # register s key is pressed
                 app.sPressed = True
-        # spell scroll
+        
+        # check for spell scroll activation key
         if('tab' in keys):
             app.displaySpellScroll = True
 
 def onKeyRelease(app,key):
+    # force lowercase to avoid any interference from accidentally holding the
+    # shift button
     key = key.lower()
+    
     if(app.gameState == 'main'):
+        # remove x thrust
         if((key == 'a') or (key == 'd')):
             app.player['x'].currentThrust = 0
+        # remove y thrust
         if((key == 'w') or (key == 's')):
             app.player['y'].currentThrust = 0
             app.player['y'].frictionConstant = -1
+        # update s key press
         if(key == 's'):
             app.sPressed = False
+        # update spell scroll display
         if(key == 'tab'):
             app.displaySpellScroll = False
+
+    # setting values that need to be released during game states that prohibit
+    # the registration of key presses to 0, otherwise, their values persist
+    # even when the keys that need to be held to active them are no longer held
+    elif(app.gameState in {'paused', 'tutorial'}):
+        app.player['x'].currentThrust = 0
+        app.player['y'].currentThrust = 0
+        app.player['y'].frictionConstant = -1
+        app.sPressed = False
+        app.displaySpellScroll = False
 
 def onMousePress(app,mouseX,mouseY,button):
     if(app.gameState == 'main'):
 
+        # debug feature
         if(app.printMouseScreenSector):
             getMouseScreenSector(app,mouseX,mouseY)
             print(app.mouseScreenSector)
-
-        # testing lighting engine
-        # app.lightSources.append(lightSource(2,255,(mouseX/app.lightmapScalingFactor),(mouseY/app.lightmapScalingFactor),(mouseY/app.lightmapScalingFactor),0.95))
-        # if(button == 0):
-        #     chargeSpell(app,'testLightSpell')
         
+        # right click to cast aggressive spells
         if((button == 0) and (len(app.spellData['aggressive'].activeSpell) == 1) and app.spellOrbCharged):
             # print('iniating aggressive spell cast')
             app.playerManaRechargeCounter = 0
             initiateSpellCast(app,app.spellData['aggressive'].activeSpell[0].name,mouseX,mouseY)
+        
+        # left click to cast defensive spells
         elif((button == 2) and (len(app.spellData['defensive'].activeSpell) == 1) and (app.spellData['defensive'].drawingSpell == False) and app.spellOrbCharged):
             # print('iniating defensive spell cast')
             app.playerManaRechargeCounter = 0
             getMouseScreenSector(app,mouseX,mouseY)
             initiateSpellCast(app,app.spellData['defensive'].activeSpell[0].name,mouseX,mouseY)
             
-            # if button 2 is pressed and the shield spell has already been cast
-            # deactivate shield spell
+        # if button 2 is pressed and the shield spell has already been cast
+        # deactivate shield spell
         elif((button == 2) and (len(app.spellData['defensive'].activeSpell) == 1) and (app.spellData['defensive'].activeSpell[0].name == 'shield') and (not app.spellOrbCharged)):
             app.playerMana = min((app.playerMana + app.spells['shield'].manaCost), app.playerMaxMana)
             app.removeShield = True
 
     elif(app.gameState == 'menu'):
+        # getting play button alignment
         playButtonWidth = int(app.gui['menuPlayButton'].imageWidth * app.gui['menuPlayButton'].imageScale)
         playButtonHeight = int(app.gui['menuPlayButton'].imageHeight * app.gui['menuPlayButton'].imageScale)
         playButtonLeft = app.gui['menuPlayButton'].xPosition - (playButtonWidth // 2)
         playButtonRight = app.gui['menuPlayButton'].xPosition + (playButtonWidth // 2)
         playButtonTop = app.gui['menuPlayButton'].yPosition - (playButtonHeight // 2)
         playButtonBottom = app.gui['menuPlayButton'].yPosition + (playButtonHeight // 2)
+        # checking for play button click
         if((playButtonLeft < mouseX < playButtonRight) and (playButtonTop < mouseY < playButtonBottom)):
             app.gameState = 'startCutscene'
             
 def onMouseMove(app,mouseX,mouseY):
+    # using mouse positioning to get the side of the spell orb that the mouse 
+    # is on
     if(app.gameState == 'main'):
         for spellType in app.spellTypes:
             if(not(app.spellData[spellType].spellCastingEnabler)):
                 getMouseOrbSide(app,mouseX)
+
+    # checking for mouseover play button during title screen
     elif(app.gameState == 'menu'):
         playButtonWidth = int(app.gui['menuPlayButton'].imageWidth * app.gui['menuPlayButton'].imageScale)
         playButtonHeight = int(app.gui['menuPlayButton'].imageHeight * app.gui['menuPlayButton'].imageScale)
@@ -3365,14 +3770,23 @@ def onMouseMove(app,mouseX,mouseY):
             app.gui['menuPlayButton'].mouseOver = False
 
 def onStep(app):
+    # GUI
     updateGui(app)
+
     if(app.gameState == 'main'):
+        # PLAYER
         updatePlayerImage2(app)
+        updatePlayerVelocity(app)
+        
+        # TILEABLE IMAGES
         for tileableImageName in app.tileableImageList:
             updateTiles(app,tileableImageName)
-        updatePlayerVelocity(app)
+        
+        # LIGHTING
         updateLightmap(app,False)
         updateLightsources(app)
+        
+        # SPELLS
         for spellType in app.spellTypes:
             if(len(app.spellData[spellType].activeSpell) == 1):
                 if(app.spellData[spellType].spellCastingEnabler):
@@ -3381,112 +3795,100 @@ def onStep(app):
             else:
                 app.spellData[spellType].spellCastingEnabler = False
         app.castingSpell = app.spellData['aggressive'].spellCastingEnabler or app.spellData['defensive'].spellCastingEnabler
-        # if(app.castSpellNow):
-        #     if(len(app.activeAggressiveSpells) == 1):
-        #         for spell in app.activeAggressiveSpells:
-        #             castSpell(app,spell.name)
-        #     elif(len(app.activeDefensiveSpells) == 1):
-        #         for spell in app.activeDefensiveSpells:
-        #             castSpell(app,spell.name)
-        #     else:
-        #         app.castSpellNow = False
+        
+        # SPELL ORB
         updateSpellOrb(app)
+        
+        # PROJECTILES
         updateProjectiles(app)
+        
+        # ENEMIES
         updateEnemies(app)
+        
+        # HITBOXES
         if(app.boundingBox != None):
             app.boundingBox.checkPlayerLocation(app)
         for hitboxName in app.hitbox:
             updateHitbox(app,app.hitbox[hitboxName])
         checkCollisions(app)
+        
+        # PICKUPS
         deletePickups(app)
+        
+        # PLAYER IMMUNITY FRAMES
         if(app.playerImmunityFrames != 0):
             app.playerImmunityFrames -= 1
+        
+        # SCREEN SHAKE
         updateScreenShake(app)
+    
+    # SIMPLE ANIMATIONS
+    if(app.gameState in 'main','winCutscene'):
         for i in app.simpleAnimations:
             i.update(app)
 
 def redrawAll(app): 
-    if(app.gameState in {'main','paused','dead'}):
-        # app.tileableImageList
+    if(app.gameState in {'main','paused','dead','winCutscene'}):
+        # TILEABLE IMAGES
         for tileableImageName in app.tileableImageList:
             drawTiles(app,tileableImageName)
+        
+        # OVERLAY
         for overlay in app.overlays:
             app.overlays[overlay].draw(app)
+        
+        # PICKUPS
         for pickup in app.pickups:
             app.pickups[pickup].draw(app)
+        
+        # LASERS!!
         if('insidiousCreature' in app.enemies):
-            app.enemies['insidiousCreature'].drawLazers()
+            app.enemies['insidiousCreature'].drawLasers()
+        
+        # PLAYER
         drawPlayer(app)
+        
+        # SPELL ORB
         drawSpellOrb(app)
+        
+        # ENEMIES
         drawEnemies(app)
+        
+        # SIMPLE ANIMATIONS
+        for i in app.simpleAnimations:
+            i.draw(app)
+    
     if(app.gameState == 'main'):
+        # SPELLS
         for spellType in app.spellTypes:
             for spell in app.spellData[spellType].activeSpell:
                 if(app.spellData[spellType].drawingSpell):
                     drawSpell(app,spell.name)
-        # for spell in app.activeDefensiveSpells:
-        #     if(app.drawingSpell):
-        #         drawSpell(app,spell.name)
+        
+        # PROJECTILES
         for projectile in app.activeMapProjectiles:
             drawProjectile(app,app.projectile[projectile].name)
         for projectile in app.activePlayerProjectiles:
             drawProjectile(app,app.projectile[projectile].name)
-        # display hitboxes
+        
+        # HITBOXES
         if(app.displayHitboxes):
             for hitboxName in app.hitbox:
                 displayHitbox(app,app.hitbox[hitboxName])
-        for i in app.simpleAnimations:
-            i.draw(app)
-    if(app.gameState in {'main','paused','dead'}):
+
+    if(app.gameState in {'main','paused','dead','winCutscene'}):
+        # LIGHTING
         drawLightmap(app)
-        # temporary readout for variables
-        if(app.transparencyTest):
-            transparencyTest(app)
-        if(app.displayScreenZones):
-            displaySectors(app)
-        if(app.displayShieldPositions):
-            displayShieldPositions(app)
-        if(app.tempDisplayReadout):
-            tempDisplayReadout(app,['currentPlayerXAcceleration',
-                                    app.player['x'].currentAcceleration,
-                                    'currentPlayerXVelocity',
-                                    app.player['x'].currentVelocity, 
-                                    'currentPlayerXThrust',
-                                    app.player['x'].currentThrust, 
-                                    'previousPlayerXVelocity',
-                                    app.player['x'].previousVelocity,
-                                    'playerXFrictionConstant',
-                                    app.player['x'].frictionConstant,
-                                    'currentPlayerXFrictionForce',
-                                    app.player['x'].currentFrictionForce,
-                                    'currentMaxPlayerXVelocity',
-                                    app.player['x'].currentMaxVelocity,
-                                    'current X gravity',
-                                    app.player['x'].gravity,
-                                    'currentPlayerYAcceleration',
-                                    app.player['y'].currentAcceleration,
-                                    'currentPlayerYVelocity',
-                                    app.player['y'].currentVelocity, 
-                                    'currentPlayerYThrust',
-                                    app.player['y'].currentThrust, 
-                                    'previousPlayerYVelocity',
-                                    app.player['y'].previousVelocity,
-                                    'playerYFrictionConstant',
-                                    app.player['y'].frictionConstant,
-                                    'currentPlayerYFrictionForce',
-                                    app.player['y'].currentFrictionForce,
-                                    'currentMaxPlayerYVelocity',
-                                    app.player['y'].currentMaxVelocity,
-                                    'current Y gravity',
-                                    app.player['y'].gravity,
-                                    'current ground YOffset',
-                                    app.ti['ground'].yOffset,
-                                    'playerWingCounter',
-                                    app.playerWingCounter,
-                                    'current player state',
-                                    app.playerState])    
+        
+        # DEBUG - optional
+        if(app.debugFeaturesEnabled):
+            displayDebugFeatures(app) 
+
+    # BOUNDING BOX     
     if((app.gameState == 'main') and (app.boundingBox != None)):
         app.boundingBox.draw()
+    
+    # GUI
     drawGui(app) 
 
 # GAME SETUP
@@ -3786,9 +4188,9 @@ def gameSetup(app):
 
     # establishing usable spellsr
     app.spells['testLightSpell'] = Spell('aggressive','rfv','testLightSpell','endEffect',9,500,250,1,0,50)
-    app.spells['testBall'] = Spell('aggressive','rtf','testBall','playerProjectile',2,250,250,0.25,0,10)
-    app.spells['testBall'].projectileType = 'pointHoming'
-    app.spells['testBall'].directional = True
+    # app.spells['testBall'] = Spell('aggressive','rtf','testBall','playerProjectile',2,250,250,0.25,0,10)
+    # app.spells['testBall'].projectileType = 'pointHoming'
+    # app.spells['testBall'].directional = True
     app.spells['levelOneSlimeBall'] = Spell('aggressive','grtf','levelOneSlimeBall','mapProjectile',1,250,250,0.1,5,10)
     app.spells['levelOneSlimeBall'].projectileType = 'groundbounce'
     app.spells['shield'] = Spell('defensive','zr','shield','shield',1,250,250,0.3,15,0)
@@ -3876,7 +4278,7 @@ def gameSetup(app):
 
     # ---- GUI SETUP ----
     class GuiElement:
-        def __init__(self,imagePath,xPosition,yPosition,imageWidth,imageHeight,imageScale,opacity,alignment):
+        def __init__(self,imagePath,xPosition,yPosition,imageWidth,imageHeight,imageScale,displayAngle,opacity,alignment):
             self.imagePath = imagePath
             self.xPosition = xPosition
             self.yPosition = yPosition
@@ -3884,6 +4286,7 @@ def gameSetup(app):
             self.imageHeight = imageHeight
             self.imageScale = imageScale
             self.imageScale_2 = imageScale
+            self.displayAngle = displayAngle
             self.opacity = opacity
             self.alignment = alignment
             self.mouseOver = False
@@ -3893,19 +4296,22 @@ def gameSetup(app):
 
     # establishing gui elements as instances of the guiElement class within 
     # the gui dictionary
-    app.gui['wizardDRO'] = GuiElement('images/GUI/wizardDRO.png',app.screenWidth-150,0,500,500,0.25,100,'left-top')
-    app.gui['wizardDROGrille'] = GuiElement('images/GUI/wizardDROGrille.png',app.screenWidth-150,0,500,500,0.25,100,'left-top')
-    app.gui['titleScreen'] = GuiElement('images/GUI/titleScreen.png',0,0,1000,750,1,100,'left-top')
-    app.gui['menuPlayButton'] = GuiElement('images/GUI/menuPlayButtonOff.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.25,100,'center')
-    app.gui['deathText'] = GuiElement('images/GUI/deathText.png',(app.screenWidth//2),(app.screenHeight//2),500,500,1,100,'center')
-    app.gui['bossBar'] = GuiElement('images/GUI/bossBar.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,100,'center')
-    app.gui['bossBarBackground'] = GuiElement('images/GUI/bossBarBackground.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,100,'center')
-    app.gui['theHideousBeastTitle'] = GuiElement('images/GUI/theHideousBeastTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,100,'center')
-    app.gui['insidiousCreatureTitle'] = GuiElement('images/GUI/insidiousCreatureTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,100,'center')
+    app.gui['wizardDRO'] = GuiElement('images/GUI/wizardDRO.png',app.screenWidth-150,0,500,500,0.25,0,100,'left-top')
+    app.gui['wizardDROGrille'] = GuiElement('images/GUI/wizardDROGrille.png',app.screenWidth-150,0,500,500,0.25,0,100,'left-top')
+    app.gui['titleScreen'] = GuiElement('images/GUI/titleScreen.png',0,0,1000,750,1,0,100,'left-top')
+    app.gui['menuPlayButton'] = GuiElement('images/GUI/menuPlayButtonOff.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.25,0,100,'center')
+    app.gui['deathText'] = GuiElement('images/GUI/deathText.png',(app.screenWidth//2),(app.screenHeight//2),500,500,1,0,100,'center')
+    app.gui['bossBar'] = GuiElement('images/GUI/bossBar.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,0.75,0,100,'center')
+    app.gui['bossBarBackground'] = GuiElement('images/GUI/bossBarBackground.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,0,100,'center')
+    app.gui['theHideousBeastTitle'] = GuiElement('images/GUI/theHideousBeastTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,0,100,'center')
+    app.gui['insidiousCreatureTitle'] = GuiElement('images/GUI/insidiousCreatureTitle.png',(app.screenWidth//2),int(app.screenHeight*0.875),500,500,app.gui['bossBar'].imageScale,0,100,'center')
     app.spellScrollBottomYPosition = (app.screenHeight-5)
     app.spellScrollTopYPosition = int(app.screenHeight*0.0625) 
-    app.gui['spellScroll'] = GuiElement('images/GUI/spellScroll.png',app.screenWidth,app.spellScrollBottomYPosition,500,1000,0.75,100,'top-right')
-    app.gui['pauseText'] = GuiElement('images/GUI/pauseText.png',(app.screenWidth//2),(app.screenHeight//2),500,500,1,100,'center')
+    app.gui['spellScroll'] = GuiElement('images/GUI/spellScroll.png',app.screenWidth,app.spellScrollBottomYPosition,500,1000,0.75,0,100,'top-right')
+    app.gui['pauseText'] = GuiElement('images/GUI/pauseText.png',(app.screenWidth//2),(app.screenHeight//2),500,500,1,0,100,'center')
+    app.gui['tutorial'] = GuiElement('images/GUI/tutorial.png',(app.screenWidth//2),(app.screenHeight//2),1000,750,1,0,100,'center')
+    app.gui['license'] = GuiElement('images/GUI/license.png',(app.screenWidth//2),(app.screenHeight//2),1000,750,0.1,0,100,'center')
+    app.gui['winScreen'] = GuiElement('images/GUI/winScreen.png',(app.screenWidth//2),(app.screenHeight//2),1000,750,1,0,100,'center')
 
     # setting opacities for certain gui elements
     app.startCutsceneOverlayOpacity = 0
@@ -3957,6 +4363,18 @@ def gameSetup(app):
     app.edgeFadeRate = 0.05
 
     app.edgeFadeDeathTimer = 0
+
+    # setting up timer and data for win cutscene
+    app.winTimer = 0
+
+    app.winCutsceneOverlayOpacity = 1
+
+    # setting up license spin speed
+    app.lisenceRotationSpeed = 100
+
+    # setting up restart prompt opacity
+    app.restartPromptMaxOpacity = 30
+    app.restartPromptOpacity = 0
 
     # ---- SCREEN SECTOR SETUP ----
     # six screen sectors, ssDown, ssLeft, ssRight, ssUpLeft, ssUpRight, ssUp
@@ -4038,6 +4456,9 @@ def gameSetup(app):
     # - 'dead'
     # - 'paused'
     # - 'fadeCutscene'
+    # - 'tutorial
+    # - 'winCutscene'
+    # - 'win'
     # the game starts in the menu state
     app.gameState = 'main'
 
@@ -4063,15 +4484,18 @@ def gameSetup(app):
     # ---- APP SETUP ----
     # setting the framerate
     app.stepsPerSecond = 60
-
-    # ---- TEMP DEBUG ----
+    
+    # ---- DEBUG SETUP ----
     # misc testing setup
     # app.testWalkSpeed = 10
     # app.screenLeft = 100
     # app.screenRight = app.screenWidth - 100
 
-     # set to True to enable readout, set to False to disable
-    app.tempDisplayReadout = False
+    app.debugFeatureDisplayText = []
+
+    app.debugFeaturesEnabled = False
+
+    app.displayReadout = False
 
     app.displayHitboxes = False
 
@@ -4109,4 +4533,4 @@ def main():
 
 main()
 
-# total hours spent working here: ~109
+# total hours spent working here: ~126

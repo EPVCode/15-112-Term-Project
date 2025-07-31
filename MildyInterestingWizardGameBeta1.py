@@ -2,12 +2,19 @@
 # AndrewID: esphelan
 # Section: A
 
+# general note: my use of the try, except method is referenced from my prior 
+# coding projects. I thought I should put a note about it's use since we didn't
+# explicitely learn about it in class. 
+
 # IMPORTS
 from cmu_graphics import *
 # I only use os to delete files, or detect if a file exists
+# my use of the os module is referenced from my prior coding projects
 import os  
 # I only use sys for the sys.exit() feature, which I have found to be a clean 
 # way to exit the program after an error occurs
+# this approach is directly referenced from my prior coding projects where
+# I used it for this exact reason. 
 import sys 
 # I use PIL for image cropping and resizing
 from PIL import Image
@@ -2133,6 +2140,9 @@ def tileImage(app,tileableImage,tileWidth,tileableImageName):
     tileableImage = Image.open(tileableImage)
     cropXPosition = 0
     # cropping image into tiles and saving them individually
+    # my approach for this is referenced from one of my prior coding projects, 
+    # and also researched here: 
+    # https://pillow.readthedocs.io/en/stable/reference/Image.html
     for col in range(cols):
         currentTile = tileableImage.crop((cropXPosition,0,
                                         cropXPosition+tileWidth,
@@ -2173,6 +2183,10 @@ def lightmapSetup(app):
     app.lightmapBuffer = 100
     app.lightmapMatrixX = int(app.screenWidth/app.lightmapScalingFactor)+5
     app.lightmapMatrixY = int(app.screenHeight/app.lightmapScalingFactor)+5
+    # I researched numpy arrays at
+    # https://numpy.org/devdocs/reference/arrays.html
+    # and 
+    # https://numpy.org/devdocs/user/basics.types.html
     app.lightmapOpacityMatrix = numpy.array([[[0,255]] * app.lightmapMatrixX]*app.lightmapMatrixY, dtype=numpy.uint8)
     app.lightmapXPosition = -(app.lightmapBuffer/5)
     app.lightmapYPosition = -(app.lightmapBuffer/5)
@@ -2241,6 +2255,8 @@ def updateLightmap(app,groundCheck):
             for x in range(app.lightmapMatrixX):
                 app.lightmapOpacityMatrix[y,x] = calculateLightmapGaussian(x,y,app.lightSources,opacityOffset)
         # turning the opacity matrix into a displayable image
+        # I researched this method at 
+        # https://pillow.readthedocs.io/en/stable/reference/Image.html
         lightmap = Image.fromarray(app.lightmapOpacityMatrix, mode = 'LA')
         # saving that image
         app.lightmapImage = CMUImage(lightmap)

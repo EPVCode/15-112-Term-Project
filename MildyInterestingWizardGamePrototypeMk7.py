@@ -4460,7 +4460,7 @@ def gameSetup(app):
     # - 'winCutscene'
     # - 'win'
     # the game starts in the menu state
-    app.gameState = 'main'
+    app.gameState = 'menu'
 
     app.currentBoss = None 
     

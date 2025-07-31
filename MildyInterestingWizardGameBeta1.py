@@ -2,13 +2,6 @@
 # AndrewID: esphelan
 # Section: A
 
-# TODO:
-# ADD COOL LIGHTNING SPELL
-# VIDEO IS VERY IMPORTANT!!! WORK ON VIDEO!!!! WRITE DOWN KEY FEATURES OF CODE I WANT TO POINT OUT IN VIDEO
-
-# QUESTIONS FOR PROF TAYLOR:
-# HOW DO I DIRECTLY DELETE INSTANCES OF A CLASS
-
 # IMPORTS
 from cmu_graphics import *
 # I only use os to delete files, or detect if a file exists
@@ -62,6 +55,7 @@ class Spell:
         # - linear
         # - groundbounce
         # - pointHoming
+        # - stationary
         self.projectileType = None
         self.animationFrames = frames
         self.animationCounter = 0
@@ -86,6 +80,7 @@ class Projectile:
     def __init__(self,name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell):
         self.name = name
         self.animationFrames = frames
+        self.animationFrameList = []
         self.animationCounter = 0
         self.imageWidth = imageWidth
         self.imageHeight = imageHeight
@@ -124,12 +119,15 @@ class Projectile:
         
 # initialzing linear projectile class - moves in a straight line
 class Linear(Projectile):
-    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell):
-        super().__init__(name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell)
+    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell):
+        super().__init__(name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell)
         self.directionalAcceleration = 0
         self.maxTravel = 0
         self.maxVelocity = 0
         self.directionAngle = None
+
+    def update(self):
+        return self.move()
     
     def move(self):
         if(self.directionAngle == None):
@@ -172,15 +170,29 @@ class Linear(Projectile):
 
         return (distanceTravelled >= self.maxTravel)
 
+class Stationary(Projectile):
+    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell,lifespan):
+        super().__init__(name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell)
+        self.lifespan = lifespan
+        self.timer = 0
+
+    def update(self):
+        self.imagePath = self.animationFrameList[(self.timer % len(self.animationFrameList))]
+        self.timer += 1 
+        return (self.timer % self.lifespan) == 0
+
 # initializing pointHoming projectile class - homes towards a initial point
 class PointHoming(Projectile):
-    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell):
-        super().__init__(name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell)
+    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell):
+        super().__init__(name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell)
         self.directionalAcceleration = 0
         self.nearnessFactor = 0
         self.damping = 0
         self.maxVelocity = 0
         self.directionAngle = None
+
+    def update(self):
+        return self.move()
 
     def move(self):
         dx = (self.xPosition - self.targetX)
@@ -227,8 +239,8 @@ class PointHoming(Projectile):
 
 # initializing groundbounce projectile class - fires upwards then bounces
 class Groundbounce(Projectile):
-    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell):
-        super().__init__(name,frames,imageWidth,imageHeight,imageScale,drawBuffer,displayAngle,initialX,initialY,targetX,targetY,isPlayerSpell)
+    def __init__(self,name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell):
+        super().__init__(name,frames,imageWidth,imageHeight,imageScale,displayAngle,drawBuffer,initialX,initialY,targetX,targetY,isPlayerSpell)
         self.timer = 0
         self.lifespan = 0
         self.directionAngle = None
@@ -239,6 +251,9 @@ class Groundbounce(Projectile):
         self.reboundCoefficient = 0
         self.bounces = 0
         self.maxBounces = 0
+
+    def update(self):
+        return self.move()
 
     def move(self):
         if(self.directionAngle == None):
@@ -982,10 +997,10 @@ class RectBoundingBox(BoundingBox):
                 app.playerImmunityFrames += self.outOfBoundsDamage*3
 
     def draw(self):
-        drawImage(self.verticalImagePath, self.left + self.xOffset, self.yPosition + self.yOffset, width = self.borderWidth, height = self.height, align = 'center')
-        drawImage(self.verticalImagePath, self.right + self.xOffset, self.yPosition + self.yOffset, width = self.borderWidth, height = self.height, align = 'center')
-        drawImage(self.horizontalImagePath, self.xPosition + self.xOffset, self.top + self.yOffset, width = self.width, height = self.borderHeight, align = 'center')
-        drawImage(self.horizontalImagePath, self.xPosition + self.xOffset, self.bottom + self.yOffset, width = self.width, height = self.borderHeight, align = 'center')
+        drawImage(self.verticalImagePath, (self.left + self.xOffset), (self.yPosition + self.yOffset), width = self.borderWidth, height = self.height, align = 'center')
+        drawImage(self.verticalImagePath, (self.right + self.xOffset), (self.yPosition + self.yOffset), width = self.borderWidth, height = self.height, align = 'center')
+        drawImage(self.horizontalImagePath, (self.xPosition + self.xOffset), (self.top + self.yOffset), width = self.width, height = self.borderHeight, align = 'center')
+        drawImage(self.horizontalImagePath, (self.xPosition + self.xOffset), (self.bottom + self.yOffset), width = self.width, height = self.borderHeight, align = 'center')
     
 class CircBoundingBox(BoundingBox):
     def __init__(self,xPosition,yPosition,xOffset,yOffset,displayRadius,outOfBoundsDamage):
@@ -1014,7 +1029,7 @@ class CircBoundingBox(BoundingBox):
                 app.playerImmunityFrames += self.outOfBoundsDamage*3
 
     def draw(self):
-        drawImage(self.imagePath, self.xPosition + self.xOffset, self.yPosition + self.yOffset, width = (self.displayRadius * 2), height = (self.displayRadius * 2), align = 'center')
+        drawImage(self.imagePath, (self.xPosition + self.xOffset), (self.yPosition + self.yOffset), width = (self.displayRadius * 2), height = (self.displayRadius * 2), align = 'center')
 
 # ---- SIMPLE ANIMATION ----
 class SimpleAnimation:
@@ -1089,7 +1104,7 @@ class Overlay:
         bottom = app.bottom + (self.displayHeight // 2)
         # actually drawing
         if((left < x < right) and (top < y < bottom)):
-            drawImage(self.imagePath, x + app.screenShakeX, y + app.screenShakeY, width = self.displayWidth, height = self.displayHeight, opacity = self.opacity, rotateAngle = self.displayAngle, align = self.alignment)
+            drawImage(self.imagePath, (x + app.screenShakeX), (y + app.screenShakeY), width = self.displayWidth, height = self.displayHeight, opacity = self.opacity, rotateAngle = self.displayAngle, align = self.alignment)
 
 # ---- PICKUPS ----
 class Pickup(Overlay):
@@ -1183,7 +1198,8 @@ class HitboxAngledRect(Hitbox):
         return (isinstance(other,HitboxAngledRect)) and ([int(i) for i in selfList] == [int(i) for i in otherList])
 
 # DEBUG/TESTING FUNCTIONS
-# debug function for displaying the defensive spell sectors (used especially for the shield spell)
+# debug function for displaying the defensive spell sectors 
+# (used especially for the shield spell)
 def displaySectors(app):
     sectorOpacity = 50
 
@@ -1201,7 +1217,8 @@ def displaySectors(app):
     x_0 = app.playerObject.centerX
     y_0 = app.playerObject.centerY
 
-    # arbitrary hypotenuse value, just has to be large enough such that the sectors go off the screen
+    # arbitrary hypotenuse value, just has to be large enough such that the 
+    # sectors go off the screen
     hypotenuse = 700
     for sector in app.sectorAngles:
         sectorAngle_1 = app.sectorAngles[sector][0]
@@ -1308,7 +1325,8 @@ def getAngle(dx,dy,outputType):
 
 # function to check polygon intersection, used for angled rectanlgle collisions
 def checkConvexPolygonIntersection(vertexList_1,vertexList_2):
-    # Polygon intersection referenced from https://www.gorillasun.de/blog/an-algorithm-for-polygon-intersections/
+    # Polygon intersection referenced from 
+    # https://www.gorillasun.de/blog/an-algorithm-for-polygon-intersections/
     # and implementation guided by Professor Mike Taylor and TA Nathan Xie
     insideRect = False
     for checkPoint in vertexList_1:
@@ -2172,6 +2190,9 @@ def calculateLightmapGaussian(x,y,lightSources,opacityOffset):
     maxDistance = 1000
     for lightSource in lightSources:
         if(getDistance(x,y,lightSource.x,lightSource.y) < maxDistance):
+            # gaussian function implementaiton - guided by Professor Mike Taylor
+            # and the equation was referenced from here:
+            # https://en.wikipedia.org/wiki/Gaussian_function
             opacity -= int((lightSource.intensity)*((lightsourceMaxIntensity)**((-1*(((x-lightSource.x)**2)/(2*((lightSource.spread)**2))))-(((y-lightSource.y )**2)/(2*((lightSource.spread)**2))))))
     return [0,min(max((opacity+opacityOffset),0),255)]
 
@@ -2555,9 +2576,23 @@ def activateSpellEffect(app,spellName):
         yPosition = app.spells[spellName].yPosition
         app.simpleAnimations.append(SimpleAnimation(app,frameList,3,True,displayWidth,displayHeight,rotation,'center',xPosition,yPosition,True,10))
 
+    elif(spellName == 'skySplitter'):
+        app.lightSources.append(LightSource(10,255,(app.spells[spellName].targetX/app.lightmapScalingFactor),(app.spells[spellName].targetY/app.lightmapScalingFactor),0.98))
+        imageWidth = 500
+        imageHeight = 1000
+        imageScale = 1
+        displayHeight = int(imageHeight * imageScale)
+        print(app.spells[spellName].targetY)
+        x = app.spells[spellName].targetX
+        y =  app.spells[spellName].targetY - int(displayHeight // 2) - app.ti['ground'].yOffset
+        app.projectile['skySplitterBolt'] = Stationary('skySplitterBolt',27,imageWidth,imageHeight,imageScale,0,500,x,y,x,y,False,27)
+        initiateProjectile(app,'skySplitterBolt')
+        app.activeMapProjectiles.append('skySplitterBolt')
+        app.screenShakeMagnitude += 15
+
 # PROJECTILE MANAGEMENT
 def drawProjectile(app,projectileName):
-     if(app.projectile[projectileName].imagePath != None):
+     if((app.projectile[projectileName].imagePath != None)):
         totalXPosition = (app.projectile[projectileName].xPosition+app.projectile[projectileName].xOffset)
         totalYPosition = (app.projectile[projectileName].yPosition+app.projectile[projectileName].yOffset)
         # print('totalYPosition:',totalYPosition)
@@ -2572,7 +2607,7 @@ def updateProjectiles(app):
     for projectileName in app.activeMapProjectiles:
         # updating projectiles that did not originate from player spells
         if(not app.projectile[projectileName].isPlayerSpell):
-            endCondition = app.projectile[projectileName].move()
+            endCondition = app.projectile[projectileName].update()
             if(endCondition):
                 app.projectile[projectileName].deleteMe = True
 
@@ -2583,12 +2618,16 @@ def updateProjectiles(app):
                 app.spells[projectileName].yPosition = app.projectile[projectileName].yPosition
                 app.spells[projectileName].displayAngle = app.projectile[projectileName].displayAngle
                 activateSpellEffect(app,projectileName)
-            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['tooth'].checkSet)):
-                app.enemies['insidiousCreature'].multiples['tooth'].activeInstances.remove(projectileName)
-            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].activeLasers)):
-                app.enemies['insidiousCreature'].activeLasers[projectileName].deleteMe = True
-            elif(('insidiousCreature' in app.enemies) and (projectileName in app.enemies['insidiousCreature'].multiples['bigTooth'].checkSet)):
-                app.enemies['insidiousCreature'].multiples['bigTooth'].activeInstances.remove(projectileName)
+            elif('insidiousCreature' in app.enemies):
+                enemy = app.enemies['insidiousCreature']
+                if(projectileName in enemy.multiples['tooth'].checkSet):
+                    instanceList = enemy.multiples['tooth'].activeInstances 
+                    instanceList.remove(projectileName)
+                elif(projectileName in enemy.activeLasers):
+                    enemy.activeLasers[projectileName].deleteMe = True
+                elif(projectileName in enemy.multiples['bigTooth'].checkSet):
+                    instanceList = enemy.multiples['bigTooth'].activeInstances
+                    instanceList.remove(projectileName)
             app.activeMapProjectiles.remove(projectileName)
             del app.projectile[projectileName]
             # print('removed map projectile:',projectileName)
@@ -2599,7 +2638,7 @@ def updateProjectiles(app):
     for projectileName in app.activePlayerProjectiles:
         # updating projectiles that did not originate from player spells
         if(not app.projectile[projectileName].isPlayerSpell):
-            endCondition = app.projectile[projectileName].move()
+            endCondition = app.projectile[projectileName].update()
             if(endCondition):
                 app.projectile[projectileName].deleteMe = True
             
@@ -2674,6 +2713,15 @@ def initiateProjectile(app,projectileName):
         p.radius = int(p.imageScale * 100)
         p.damping = 10
         initiateHitbox(app,projectileName,p,'player',0,0,'hitboxCircle')
+    # setup for the sky splitter bolt projectile
+    elif(projectileName == 'skySplitterBolt'):
+        p = app.projectile[projectileName]
+        p.damage = 8
+        p.animationFrameList = [f'images/spells/skySplitterBolt_{i}.png' for i in range(p.animationFrames)]
+        xAdjustment = int(p.displayWidth * 0.3)
+        yAdjustment = int(p.displayHeight * 0)
+        p.initialYOffset = app.ti['ground'].yOffset
+        initiateHitbox(app,projectileName,p,'player',xAdjustment,yAdjustment,'hitboxRect')
     # reporting an error should the projectile name be unrecognized
     else:
         reportError('getting projectile data','UNRECOGNIZED PROJECTILE','initiateProjectile','recieved unexpected projectile name',projectileName,None)
@@ -3210,7 +3258,8 @@ def triggerEnemyCollision(app,hitbox_1,hitbox_2):
         if((otherHitbox.belongsTo == 'player') and (not enemyHitbox.associatedObject.invulnerable)):
             # print('contact!:',otherHitbox.associatedObject.name)
             enemyHitbox.associatedObject.health = max(enemyHitbox.associatedObject.health - otherHitbox.associatedObject.damage, 0)
-            otherHitbox.associatedObject.deleteMe = True
+            if(not (otherHitbox.associatedObject.name == 'skySplitterBolt')):
+                otherHitbox.associatedObject.deleteMe = True
         else:
             return
 
@@ -3867,9 +3916,7 @@ def redrawAll(app):
                     drawSpell(app,spell.name)
         
         # PROJECTILES
-        for projectile in app.activeMapProjectiles:
-            drawProjectile(app,app.projectile[projectile].name)
-        for projectile in app.activePlayerProjectiles:
+        for projectile in app.projectile:
             drawProjectile(app,app.projectile[projectile].name)
         
         # HITBOXES
@@ -3894,7 +3941,6 @@ def redrawAll(app):
 
 # GAME SETUP
 def gameSetup(app):
-
     # ---- WINDOW SETUP ----
     # establishing screen width
     app.screenWidth = 1000
@@ -4197,6 +4243,7 @@ def gameSetup(app):
     app.spells['shield'] = Spell('defensive','zr','shield','shield',1,250,250,0.3,15,0)
     app.spells['ghostSword'] = Spell('aggressive','1g43t','ghostSword','mapProjectile',1,250,250,0.5,15,10)
     app.spells['ghostSword'].projectileType = 'linear'
+    app.spells['skySplitter'] = Spell('aggressive','ztqv14gr23','skySplitter','endEffect',10,500,200,1,0,50)
     # establishing signifier that tells which side of the screen the mouse is on
     app.mouseOrbSide = 'right'
 
@@ -4534,4 +4581,4 @@ def main():
 
 main()
 
-# total hours spent working here: ~126
+# total hours spent working here: ~130

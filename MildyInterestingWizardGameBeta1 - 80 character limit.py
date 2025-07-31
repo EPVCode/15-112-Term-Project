@@ -4967,7 +4967,7 @@ def gameSetup(app):
     app.spells['ghostSword'].projectileType = 'linear'
     
     app.spells['skySplitter'] = Spell(
-        'aggressive','ztqv14gr23','skySplitter','endEffect',10,500,200,1,0,50)
+        'aggressive','ztqv14gr23','skySplitter','endEffect',10,500,200,1,50,50)
     
     # establishing signifier that tells which side of the screen the mouse is on
     app.mouseOrbSide = 'right'

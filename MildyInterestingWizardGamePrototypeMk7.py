@@ -580,7 +580,7 @@ class InsidiousCreature(Enemy):
                     self.rotationSpeed = max((self.rotationSpeed * self.rotationAcceleration)-1, self.targetRotationSpeed)
         
         # phase 3 attacks and behaviors
-        elif((self.phase == 3)):
+        elif((self.phase == 3) and not (self.subphase == 'phaseChange_3')):
             # managing circular bounding box
             self.boundingBoxSetRadius = 800
             if(app.boundingBox == None):
@@ -762,7 +762,7 @@ class InsidiousCreature(Enemy):
             self.imagePath = 'images/insidiousCreature/eyesOpen.png'
         
         # setting phase 2 and phase 2 transition images
-        elif(self.phase == 2):
+        elif(self.phase == 2): 
             if(self.subphase == 'phaseChange_2'):
                 self.imagePath = 'images/insidiousCreature/eyesOpen.png'
             else:
@@ -864,6 +864,7 @@ class InsidiousCreature(Enemy):
                 self.playerDamageOnHit = 30
             # transition from phase 2 - 3
             if((self.subphase == 'phaseChange_3') and self.subphaseCounter >= 40):
+                self.subphase = 'final'
                 self.invulnerable = False
                 self.playerDamageOnHit = 20
 
